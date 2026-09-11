@@ -1,0 +1,43 @@
+# PRD — Calcul Rent Auto RCA (Solicitare Acord Plata)
+
+## Problem Statement (original)
+Inspector daune auto (Groupama) foloseste zilnic un Excel cu macro VBA ("Solicitare Acord Plata")
+care calculeaza numarul zilelor de inchiriere auto (lipsa de folosinta) pe RCA in Romania si
+genereaza textul unei solicitari de acord plata. Vrea o aplicatie web in cloud, accesibila de
+oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionista.
+
+## Architecture
+- Frontend: React (CRA + craco), Tailwind, shadcn/ui, framer-motion, sonner. Single-page
+  workspace (formular stanga / rezultate + scrisoare dreapta). Fonts: Outfit/Inter/JetBrains Mono.
+- Backend: FastAPI, stateless. Logica de calcul portata 1:1 din macro-ul VBA (`calc.py`).
+- Fara baza de date, fara autentificare (single-user, per cererea utilizatorului).
+- Zile libere legale RO preincarcate (`holidays_ro.py`), editabile in UI (persistate in localStorage).
+
+## User Persona
+- Inspector daune auto care instrumenteaza dosare RCA si trimite solicitari de acord plata colegilor.
+
+## Core Requirements (static)
+- Reproducere exacta a calculului de zile rent din macro (intersectie rent∩reparatie, zile
+  avizare-constatare, zile reparatie = ceil(ore/4), weekend-uri, zile culpa, zile libere legale,
+  plafonare la zile facturate).
+- Detectare automata norma dupa data emitere RCA (N20 / N18 / HG298 / N18 dupa incetarea HG298).
+- Valoare reparatie = (piese+materiale+manopera) * (1+TVA/100).
+- Logica abuz pret rent si formula suma (IF oferta*1.2 < facturat => oferta*zile, altfel facturat*zile).
+- Generare text solicitare (identic cu output-ul Excel), editabil, cu copy-to-clipboard + mailto.
+
+## Implemented (2026-06-11)
+- POST /api/calculate + GET /api/holidays.
+- Formular complet cu toate campurile din "Fisa de completat", preumplut cu exemplul din dosar.
+- KPI-uri (zile aprobate, suma, valoare reparatie, economie), cronologie zi-cu-zi colorata,
+  scrisoare editabila, copiere + deschidere client email, manager zile libere, dark mode, reset.
+- Verificat: sample => 15 zile, 5445 lei, 39347.19 lei, 9 zile reparatie — identic cu Excel.
+- Testat: 17/17 backend + frontend 100%.
+
+## Backlog / Next (P1/P2)
+- P1: Export PDF al solicitarii; salvare/istoric dosare (daca se doreste ulterior).
+- P1: Trimitere email server-side (Resend/SendGrid) in loc de mailto.
+- P2: Autentificare simpla daca aplicatia devine multi-user.
+- P2: Import direct din fisierul Excel.
+
+## Next Tasks
+- Astept feedback pe wording/format scrisoare si eventuale cazuri suplimentare (culpa, HG298).

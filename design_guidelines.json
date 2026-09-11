@@ -1,0 +1,126 @@
+{
+  "project_title": "Calcul Rent Auto RCA - Solicitare Acord Plată (Groupama Inspector Tool)",
+  "app_type": "saas_app",
+  "theme_strategy": {
+    "default_mode": "light",
+    "support_dark_toggle": true,
+    "rationale": "High-density data entry tool used for long hours by insurance damage inspectors. Light theme offers maximum clarity for numeric values and printed formal letters, while Dark theme provides relief during night shifts."
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Inter, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "font_sources": [
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
+    ],
+    "scale": {
+      "h1": "text-2xl sm:text-3xl font-extrabold tracking-tight",
+      "h2": "text-xl sm:text-2xl font-bold tracking-tight",
+      "h3": "text-lg font-semibold",
+      "h4": "text-base font-semibold",
+      "body": "text-sm leading-relaxed",
+      "small": "text-xs text-muted-foreground",
+      "metric_large": "font-mono text-3xl sm:text-4xl font-extrabold tracking-tight"
+    }
+  },
+  "colors": {
+    "archetype": "SWISS & CORPORATE PRECISION (Groupama Emerald & Slate)",
+    "palette": {
+      "groupama_emerald": "#005F4B",
+      "groupama_emerald_hover": "#004B3B",
+      "corporate_navy": "#0F2942",
+      "accent_amber": "#D97706",
+      "accent_amber_light": "#FEF3C7",
+      "status_success": "#059669",
+      "status_info": "#2563EB",
+      "status_warning": "#EA580C",
+      "status_danger": "#DC2626",
+      "slate_bg_light": "#F8FAFC",
+      "slate_card_light": "#FFFFFF",
+      "slate_border": "#E2E8F0",
+      "dark_bg": "#0B131F",
+      "dark_card": "#131F31",
+      "dark_border": "#1E2D42"
+    },
+    "rules": {
+      "contrast_check": "Ensure APCA compliant contrast for numeric inputs, labels, and generated letter preview.",
+      "tinted_greys": "Use slate-tinted greys (#F8FAFC, #0F172A) instead of pure black or pure white.",
+      "forbidden_colors": [
+        "#1B93A4",
+        "#7351B7"
+      ]
+    }
+  },
+  "layout_and_spacing": {
+    "architecture": "Two-Column Split Workspace (Form Left + Live Results Preview Right)",
+    "left_column": "w-full lg:w-[58%] space-y-6 max-w-4xl",
+    "right_column": "w-full lg:w-[42%] sticky top-6 self-start space-y-6",
+    "spacing_scale": "Density optimized for professional claims inspectors: forms use tight p-4 / p-5 containers with clear border dividers; metric cards use p-5 with high-contrast JetBrains Mono numbers.",
+    "bento_grid": "MODE B - High Density Grid for data inputs, labor hour breakdowns, and chronological date pickers."
+  },
+  "component_guidelines": {
+    "header": "Sticky navigation header with Groupama brand badge, case title input / quick preset selector, Romanian legal holiday manager button, and dark/light mode toggle. Glassmorphism backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b z-40.",
+    "form_sections": [
+      {
+        "id": "date_dosar",
+        "title": "Date Dosar & Părți Vătămate",
+        "icon": "FileText",
+        "fields": ["nr_dosar", "asigurat_rca", "pagubit_nume", "nr_inmatriculare_pagubit", "societate_asigurare"]
+      },
+      {
+        "id": "factura_reparatie",
+        "title": "Date Factură Reparație & Ore Manoperă",
+        "icon": "Wrench",
+        "fields": ["valoare_piese_fara_tva", "valoare_piese_cu_tva", "valoare_vopsitorie", "ore_tinichigerie", "ore_vopsitorie", "tarif_ora_manopera", "tva_percent"]
+      },
+      {
+        "id": "rent_details",
+        "title": "Date Lipsă de Folosință (Rent-a-Car)",
+        "icon": "Car",
+        "fields": ["marca_auto_pagubit", "clasa_oferita", "pret_zi_fara_tva", "pret_zi_cu_tva", "nr_zile_solicitate_factura", "furnizor_rent"]
+      },
+      {
+        "id": "cronologie_perioade",
+        "title": "Perioade & Calendare (Cronologie Data-Level)",
+        "icon": "Calendar",
+        "fields": ["data_avizare", "data_constatare", "data_reconstatare", "data_comanda_piese", "data_sosire_piese", "perioada_rent_start", "perioada_rent_end", "perioada_reparatie_start", "perioada_reparatie_end"]
+      }
+    ],
+    "results_panel": {
+      "metric_highlights": "3 Top KPI Cards: Total Zile Aprobate (Large Emerald Number), Total Sumă de Plată (RON cu TVA), and Diferență / Economie Solicitat vs Arobat.",
+      "chronological_table": "Day-by-Day timeline list displaying each date, weekday, flag for Romanian legal holiday or non-working day, activity state (Constatare, Așteptare piese, Reparație tinichigerie/vopsitorie, Reconstatare), and Rent eligibility (+1 day or 0 days).",
+      "letter_generator": "Full formatted 'Solicitare Acord Plată' official document text with inline highlights, copy-to-clipboard button with toast feedback, and 'Deschide în Mail Client' (mailto link generator).",
+      "holiday_manager": "Modal/Drawer component to add/remove custom Romanian legal holidays (e.g., 1 Ianuarie, Paște, 1 Decembrie) which dynamically recalculates non-working days."
+    }
+  },
+  "motion_and_interactions": {
+    "hover_effects": "Subtle border highlight transition-colors duration-150 on form cards and inputs.",
+    "button_feedback": "Active scale down transform duration-100 (active:scale-[0.98]) for Calculate button.",
+    "toast_notifications": "Sonner toast notifications on Copy to Clipboard, PDF Export, and Holiday updates.",
+    "prefers_reduced_motion": "Respect user prefers-reduced-motion CSS media query."
+  },
+  "testing_attributes": {
+    "requirement": "All interactive elements (buttons, inputs, select triggers, tab buttons, copy actions, modals) MUST include data-testid attributes in kebab-case format.",
+    "examples": [
+      "data-testid=\"nr-dosar-input\"",
+      "data-testid=\"calculeaza-rent-button\"",
+      "data-testid=\"copy-solicitare-letter-button\"",
+      "data-testid=\"open-email-client-button\"",
+      "data-testid=\"total-zile-rent-result\"",
+      "data-testid=\"total-suma-ron-result\"",
+      "data-testid=\"manage-holidays-trigger\""
+    ]
+  },
+  "image_urls": {
+    "logo_and_brand": "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=600&q=80",
+    "car_damage_context": "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=80"
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Never center align the app container. Keep left-aligned natural flow for forms and data tables.",
+    "Avoid generic centered Bootstrap layouts. Use the crisp 2-column inspector workspace layout.",
+    "All interactive elements MUST have explicit data-testid attributes.",
+    "Do NOT use pure #000000 or un-styled form inputs. Use custom styled Shadcn components or Tailwind input classes with clear active/focus rings.",
+    "Number display and calculation results MUST use JetBrains Mono or IBM Plex Mono font with currency (RON / Lei) clearly formatted.",
+    "Use sonner for toast notifications when copying letter text or updating legal holidays."
+  ]
+}
