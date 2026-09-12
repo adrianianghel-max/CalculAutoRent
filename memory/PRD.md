@@ -26,7 +26,8 @@ oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionis
 - Generare text solicitare (identic cu output-ul Excel), editabil, cu copy-to-clipboard + mailto.
 
 ## Implemented (2026-06-12) — Migrare completa functii Excel + GDPR
-- Perioade de culpa DINAMICE (Reconstatare/Comanda piese, numerotate automat, intersectii numarate o singura data).
+- Perioade de culpa DINAMICE: Reconstatare / Comanda piese / Antifrauda (butoane +),
+  numerotate automat per tip, intersectii numarate o singura data.
 - Formular RECONSTRUIT ca in Excel "Fisa de completat": banner Numar dosar, Date Pagubit
   (marca/model, nr inmatriculare, nume+adresa pagubit, data eveniment, data depunere CD, status,
   bloc Cesionar cu CUI+ANAF), Date Factura Reparatie (nr/data, CUI emitent+ANAF, valoare facturata,
@@ -38,6 +39,8 @@ oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionis
   nr dosar, nr inmatriculare, marca/model, nume pagubit, data eveniment, data notificare/avizare si
   data emitere RCA ("Date Given"). Extragere CUI-uri din marcaje galbene (highlight) in ordine.
 - Cautare CUI la ANAF (API oficial v9) prin proxy backend -> completeaza nume+adresa+judet.
+- Extragere CUI din marcaje galbene: trateaza si prefixul "RO" (ex. RO37686707 -> 37686707);
+  validat pe cd.pdf real (2 highlight-uri: RO37686707 -> cesionar, 40807221 -> reparatie).
 - Export PDF al scrisorii (jsPDF).
 - Testat: backend 20/20, frontend 5/5 fluxuri (iteration_3.json). Paritate calcul JS vs Excel confirmata (15 zile / 5445 / 39347.19).
 

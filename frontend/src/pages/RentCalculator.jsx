@@ -57,6 +57,12 @@ const TYPE_STYLES = {
   liber: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-950/40 dark:text-fuchsia-300 dark:border-fuchsia-900",
 };
 
+const CULPA_BADGE = {
+  reconstatare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
+  comanda_piese: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
+  antifrauda: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
+};
+
 function Field({ label, id, children, hint, className }) {
   return (
     <div className={`space-y-1.5 ${className || ""}`}>
@@ -146,8 +152,10 @@ export default function RentCalculator() {
   const set = (key) => (e) => patch({ [key]: e.target.value });
 
   // ---------- perioade de culpa dinamice ----------
-  const culpaTypeName = (type) => (type === "comanda_piese" ? "Comandă piese" : "Reconstatare");
-  const culpaLabelPlain = (type) => (type === "comanda_piese" ? "comanda piese" : "reconstatare");
+  const culpaTypeName = (type) =>
+    type === "comanda_piese" ? "Comandă piese" : type === "antifrauda" ? "Antifraudă" : "Reconstatare";
+  const culpaLabelPlain = (type) =>
+    type === "comanda_piese" ? "comanda piese" : type === "antifrauda" ? "antifrauda" : "reconstatare";
   const culpaNumber = (list, idx) =>
     list.slice(0, idx + 1).filter((p) => p.type === list[idx].type).length;
 
@@ -574,12 +582,15 @@ export default function RentCalculator() {
                   <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => addCulpa("comanda_piese")} data-testid="add-comanda-piese-button">
                     <Plus className="h-3 w-3" /> Comandă piese
                   </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => addCulpa("antifrauda")} data-testid="add-antifrauda-button">
+                    <Plus className="h-3 w-3" /> Antifraudă
+                  </Button>
                 </div>
               </div>
 
               {(form.culpa_periods || []).length === 0 ? (
                 <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-4 text-center text-[11px] text-muted-foreground">
-                  Nicio perioadă de culpă adăugată. Folosește butoanele de mai sus (Reconstatare 1, 2… / Comandă piese 1, 2…).
+                  Nicio perioadă de culpă adăugată. Folosește butoanele de mai sus (Reconstatare 1, 2… / Comandă piese 1, 2… / Antifraudă 1, 2…).
                 </p>
               ) : (
                 <div className="space-y-3" data-testid="culpa-periods-list">
@@ -587,11 +598,7 @@ export default function RentCalculator() {
                     <div key={p.id} className="rounded-lg border bg-muted/20 p-3" data-testid={`culpa-period-row-${idx}`}>
                       <div className="mb-2 flex items-center justify-between">
                         <span
-                          className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
-                            p.type === "comanda_piese"
-                              ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900"
-                              : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900"
-                          }`}
+                          className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${CULPA_BADGE[p.type] || CULPA_BADGE.reconstatare}`}
                           data-testid={`culpa-period-label-${idx}`}
                         >
                           {culpaTypeName(p.type)} {culpaNumber(arr, idx)}

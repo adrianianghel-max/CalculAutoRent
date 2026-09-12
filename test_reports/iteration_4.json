@@ -1,0 +1,15 @@
+{
+  "summary": "Frontend-only retest of the two new features on top of the RCA rental calculator. (1) Antifrauda culpa type: add-antifrauda-button adds a row labeled 'Antifraudă 1' (and 'Antifraudă 2' on second click). Mixed culpa types renumber independently ('Reconstatare 1', 'Comandă piese 1', 'Antifraudă 1'); deleting the Reconstatare row leaves the other two intact. A single Antifrauda period 22.07.2026–24.07.2026 within the rent window produces the expected letter line 'Perioada antifrauda 1 : 22.07.2026 - 24.07.2026 total 3 zile' and the cronologie shows 22/23/24 as culpa (Antifrauda 1 amber badge). (2) PDF highlight CUI extraction: uploading cd.pdf via the hidden data-testid=pdf-file-input (no click needed) processed in ~1s and populated cui-cesionar-input='37686707' (RO stripped) and rep-cui-input='40807221'. Success toast shown ('Date culese din PDF: CUI 1 (cesionar), CUI 2 (reparatie).'). NO backend POST occurred during the upload — GDPR requirement (PDF bytes never leave the client) verified. (3) Regression: fresh page → click Calculează yields total-zile-rent=15, total-suma-ron=5.445,00, valoare-reparatie=39.347,19.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None. Downloaded sample cd.pdf (12MB, 21 pages, 2 yellow highlights) to /tmp/cd.pdf for the highlight extraction test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Antifrauda culpa type and RO-prefix highlight-CUI extraction both work end-to-end. Selectors: add-antifrauda-button, culpa-period-label-{idx}, culpa-start-input-{idx}, culpa-end-input-{idx}, remove-culpa-period-{idx}, pdf-file-input (hidden, use set_input_files), cui-cesionar-input, rep-cui-input. The PDF upload does not trigger backend POSTs (confirmed via request listener) — CUI lookup only fires on ANAF button clicks.",
+  "rca of the issue": "N/A — no bugs found in this iteration."
+}

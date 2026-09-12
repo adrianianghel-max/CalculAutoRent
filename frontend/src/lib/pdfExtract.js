@@ -119,7 +119,7 @@ export function extractPolita(text) {
 export function extractCuisFromHighlights(highlights) {
   const cuis = [];
   for (const h of highlights) {
-    const m = h.match(/\b(\d{2,10})\b/);
+    const m = h.match(/\b(?:RO)?\s*(\d{2,10})\b/i);
     if (m) cuis.push(m[1]);
   }
   return cuis;
