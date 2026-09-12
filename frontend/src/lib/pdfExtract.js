@@ -115,6 +115,12 @@ export async function readHighlights(file, { ocr = false } = {}) {
     const annots = await page.getAnnotations();
     const highlights = annots.filter((a) => a.subtype === "Highlight");
     if (!highlights.length) continue;
+    highlights.sort((a, b) => {
+      const ba = bboxOf(a);
+      const bb = bboxOf(b);
+      if (Math.abs(bb.ymax - ba.ymax) > 3) return bb.ymax - ba.ymax;
+      return ba.xmin - bb.xmin;
+    });
     const content = await page.getTextContent();
     const items = content.items
       .filter((it) => it.str && it.str.trim())
@@ -179,23 +185,58 @@ export function extractPolita(text) {
   return out;
 }
 
-// Clasifica marcajele galbene: numere pure (CUI, cu/fara RO) vs text (adresa etc.).
+// Incearca sa reconstruiasca o data (dd/mm/yyyy) dintr-un text de marcaj, chiar daca e "murdar".
+function parseHighlightDate(text) {
+  const nums = (text.match(/\d+/g) || []);
+  const yi = nums.findIndex((n) => n.length === 4 && +n >= 1990 && +n <= 2100);
+  if (yi < 0) return null;
+  const year = nums[yi];
+  const others = nums.filter((_, i) => i !== yi).filter((n) => +n >= 1 && +n <= 31);
+  if (others.length < 2) return null;
+  const gt12 = others.find((n) => +n > 12);
+  let day;
+  let month;
+  if (gt12) {
+    day = gt12;
+    month = others.find((n) => n !== gt12 && +n <= 12) || others.find((n) => n !== gt12);
+  } else {
+    day = others[0];
+    month = others[1];
+  }
+  if (!day || !month) return null;
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+}
+
+// Clasifica marcajele galbene (in ordinea de citire): CUI / numar factura / data / adresa.
 export function classifyHighlights(highlights) {
   const cuis = [];
+  const numbers = [];
+  const dates = [];
   const addresses = [];
   for (const raw of highlights) {
     const h = (raw || "").replace(/\s+/g, " ").trim();
     if (!h) continue;
-    const compact = h.replace(/\s+/g, "");
-    const cuiM = compact.match(/^(?:RO)?(\d{2,10})$/i);
-    if (cuiM) {
-      cuis.push(cuiM[1]);
+    const date = parseHighlightDate(h);
+    if (date) {
+      dates.push(date);
       continue;
     }
-    const letters = (h.match(/[A-Za-zĂÂÎȘȚăâîșț]/g) || []).length;
-    if (letters >= 3) addresses.push(h);
+    const compact = h.replace(/\s+/g, "");
+    const roCui = compact.match(/^RO(\d{2,10})$/i);
+    const digitGroups = (h.match(/\d+/g) || []).slice().sort((a, b) => b.length - a.length);
+    const mainNum = digitGroups[0] || "";
+    const hasNr = /nr/i.test(h);
+    if (roCui) {
+      cuis.push(roCui[1]);
+    } else if (mainNum && (hasNr || mainNum[0] === "0")) {
+      numbers.push(mainNum);
+    } else if (/^\d{2,10}$/.test(compact)) {
+      cuis.push(compact);
+    } else if ((h.match(/[A-Za-zĂÂÎȘȚăâîșț]/g) || []).length >= 3) {
+      addresses.push(h);
+    }
   }
-  return { cuis, addresses };
+  return { cuis, numbers, dates, addresses };
 }
 
 // Extrage CUI-urile (2-10 cifre) din marcajele galbene, in ordine.

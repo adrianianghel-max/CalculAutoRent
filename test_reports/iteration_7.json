@@ -1,0 +1,26 @@
+{
+  "summary": "Retest of (a) calendar-picker popover on date fields + typing autoformat, (b) invoice/CUI extraction from cd.pdf highlights, (c) GDPR no-network on upload, (d) regression calculate. All 4 areas PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "calendar_picker_rent_start": "PASS - popover opens, day click sets dd/mm/yyyy (28/06/2026)",
+    "calendar_picker_data_avizare": "PASS - popover opens, day click sets dd/mm/yyyy (28/06/2026)",
+    "typing_autoformat_rent_end": "PASS - typing '05032027' -> '05/03/2027'",
+    "pdf_extraction_cd_pdf": "PASS - all 7 fields match expected: rep-factura-nr=1002, rep-factura-data=31/08/2026, rent-factura-nr=00021, rent-factura-data=31/08/2026, cui-cesionar=37686707, rep-cui=37686707, rent-cui=40807221 (completed <2s)",
+    "gdpr_no_network": "PASS - 0 /api/* requests fired during PDF upload",
+    "regression_calculate": "PASS - total-zile-rent=15, total-suma-ron=5.445,00, valoare-reparatie=39.347,19; cronologie dates use dd/mm/yyyy slashes"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Downloaded cd.pdf to /tmp/cd.pdf for upload test",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All requested features verified working end-to-end via DOM assertions on preview URL. PDF extraction from cd.pdf highlights maps correctly per classifyHighlights order."
+}

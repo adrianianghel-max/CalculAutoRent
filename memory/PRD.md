@@ -26,12 +26,14 @@ oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionis
 - Generare text solicitare (identic cu output-ul Excel), editabil, cu copy-to-clipboard + mailto.
 
 ## Implemented (2026-06-12) — Migrare completa functii Excel + GDPR
-- Toate datele in format dd/mm/yyyy (inputuri text cu auto-format la tastare); calculul si
-  scrisoarea afiseaza datele cu "/". parseDate accepta dd/mm/yyyy, dd.mm.yyyy si yyyy-mm-dd.
+- Toate datele in format dd/mm/yyyy: input text cu auto-format la tastare + buton calendar
+  (popover) pentru selectie vizuala. Calculul si scrisoarea afiseaza datele cu "/".
 - "Status deplasare" lista (NEDEPLASABIL implicit / DEPLASABIL); "TVA eticheta" lista
   (CU TVA implicit / FARA TVA) — se reflecta in textul scrisorii.
-- Extragere facturi din PDF (nr+data reparatie/rent): PENDING — se va prelua din marcaje galbene
-  in ordinea nr rep -> data rep -> nr rent -> data rent (astept PDF exemplu de la user).
+- Extragere facturi din PDF (marcaje galbene): fiecare bloc = CUI + nr factura + data.
+  classifyHighlights separa CUI (RO.../numar simplu) vs nr factura (prefix "Nr"/zero initial)
+  vs data (reconstruita chiar din text murdar). Maparea: bloc 1 -> reparatie, bloc 2 -> rent.
+  rep_cui=cui_cesionar=CUI bloc1, rent_cui=CUI bloc2. Validat pe cd.pdf real (7 campuri corecte).
 - Perioade de culpa DINAMICE: Reconstatare / Comanda piese / Antifrauda (butoane +),
   numerotate automat per tip, intersectii numarate o singura data.
 - Formular RECONSTRUIT ca in Excel "Fisa de completat": banner Numar dosar, Date Pagubit
