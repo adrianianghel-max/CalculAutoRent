@@ -115,7 +115,7 @@ def test_no_overlap_warning(client):
 def test_culpa_periods(client):
     # add rec1: 2026-07-16 to 2026-07-17 (2 days). These days would normally be reparatie
     # but should be tagged 'culpa'
-    p = {**DEFAULT_PAYLOAD, "rec1_start": "2026-07-16", "rec1_end": "2026-07-17"}
+    p = {**DEFAULT_PAYLOAD, "culpa_periods": [{"label": "reconstatare", "start": "2026-07-16", "end": "2026-07-17"}]}
     r = client.post(f"{BASE_URL}/api/calculate", json=p)
     d = r.json()
     culpa_days = [x for x in d["day_list"] if x["type"] == "culpa"]
@@ -143,6 +143,27 @@ def test_price_abuse_true(client):
     assert d["abuz_pret"] is True
     # suma = oferta * zile
     assert d["suma_rent"] == round(100 * d["zile_rent"], 2)
+
+
+# --- /api/cui-lookup ---
+def test_cui_lookup_valid(client):
+    r = client.post(f"{BASE_URL}/api/cui-lookup", json={"cui": "27416331"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "AUTOSERVICE" in (d.get("denumire") or "").upper()
+    assert (d.get("judet") or "").upper() == "SIBIU"
+    assert d.get("adresa")
+
+
+def test_cui_lookup_invalid_format(client):
+    r = client.post(f"{BASE_URL}/api/cui-lookup", json={"cui": "ab"})
+    assert r.status_code == 422
+
+
+def test_cui_lookup_nonexistent(client):
+    r = client.post(f"{BASE_URL}/api/cui-lookup", json={"cui": "12345678"})
+    assert r.status_code in (200, 404), r.text
+    assert r.status_code != 500
 
 
 def test_price_abuse_false(client):

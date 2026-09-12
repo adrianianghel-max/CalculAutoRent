@@ -25,6 +25,22 @@ oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionis
 - Logica abuz pret rent si formula suma (IF oferta*1.2 < facturat => oferta*zile, altfel facturat*zile).
 - Generare text solicitare (identic cu output-ul Excel), editabil, cu copy-to-clipboard + mailto.
 
+## Implemented (2026-06-12) — Migrare completa functii Excel + GDPR
+- Perioade de culpa DINAMICE (Reconstatare/Comanda piese, numerotate automat, intersectii numarate o singura data).
+- Formular RECONSTRUIT ca in Excel "Fisa de completat": banner Numar dosar, Date Pagubit
+  (marca/model, nr inmatriculare, nume+adresa pagubit, data eveniment, data depunere CD, status,
+  bloc Cesionar cu CUI+ANAF), Date Factura Reparatie (nr/data, CUI emitent+ANAF, valoare facturata,
+  pret ora manopera), Diferente Despagubire Reparatie (facturat vs acceptat + motivare pe rand),
+  Date Factura Lipsa Folosinta (rent), Perioade & Cronologie.
+- GDPR: calculul + generarea scrisorii portate 1:1 in frontend (`src/lib/rcaCalc.js`); datele personale
+  NU mai parasesc browserul. Backend pastreaza doar /api/holidays (static) si /api/cui-lookup (doar CUI public).
+- Culege Date PDF: citire locala nc.pdf + polita (pdfjs-dist, worker local in public/), regex extrage
+  nr dosar, nr inmatriculare, marca/model, nume pagubit, data eveniment, data notificare/avizare si
+  data emitere RCA ("Date Given"). Extragere CUI-uri din marcaje galbene (highlight) in ordine.
+- Cautare CUI la ANAF (API oficial v9) prin proxy backend -> completeaza nume+adresa+judet.
+- Export PDF al scrisorii (jsPDF).
+- Testat: backend 20/20, frontend 5/5 fluxuri (iteration_3.json). Paritate calcul JS vs Excel confirmata (15 zile / 5445 / 39347.19).
+
 ## Implemented (2026-06-11)
 - POST /api/calculate + GET /api/holidays.
 - Formular complet cu toate campurile din "Fisa de completat", preumplut cu exemplul din dosar.

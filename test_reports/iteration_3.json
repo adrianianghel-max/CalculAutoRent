@@ -1,0 +1,18 @@
+{
+  "summary": "Full backend + frontend verification of the rebuilt RCA calculator. Backend pytest: 20/20 pass including new /api/cui-lookup tests (valid CUI 27416331 returns M&T AUTOSERVICE SRL / SIBIU / non-empty adresa; invalid 'ab' -> 422; nonexistent '12345678' -> 404 not 500). Legacy /api/calculate default sample still returns zile_rent=15, suma_rent=5445, valoare_reparatie=39347.19. Frontend Playwright on preview URL: (1) Calculeaza yields KPIs 15 / 5.445,00 / 39.347,19 with norma badge 'N18 dupa incetarea HG298', 15 cronologie rows, letter contains 'plata a 15 zile'. (2) Cesionar ANAF lookup fills 'M&T AUTOSERVICE SRL' and full address (JUD. SIBIU, MUN. SIBIU, STR. MASINISTILOR, NR.23). (3) lookup-rep-cui-button and lookup-rent-cui-button both populate their emitent fields. (4) Culege Date PDF: setting nc.pdf + polita.pdf on pdf-file-input auto-fills nr-dosar=U21201993163, numar-inmatriculare=SB95VKZ, nume-pagubit='GHEORGHE IULIAN', marca-model='Hyundai Elantra', data-eveniment=2026-07-11, data-avizare=2026-07-15, data-emitere-rca=2026-06-11, plus success toast. (5) Export PDF triggers download 'Solicitare_U21201993163.pdf' with no JS errors. (6) Dynamic culpa (Reconstatare 16-18.07 + Comanda piese 19-20.07) recalculates -> letter contains 'Perioada reconstatare 1' and 'Perioada comanda piese 1', chronology shows amber culpa days.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_rca_calc.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py cui_lookup: CORS middleware is added AFTER app.include_router; works in FastAPI because middleware is applied at request time, but convention is to add middleware before include_router. Non-blocking.",
+    "cui_lookup rejects <2 digit input as 422 which is correct; for well-formed but unknown CUI ANAF returns empty 'found' array -> mapped to 404 'CUI negasit'. Verified with cui=12345678 returning 404.",
+    "PDF parsing is fully client-side per GDPR requirement; verified in browser DOM after set_input_files without any network call to backend for PDF content."
+  ],
+  "updated_files": ["/app/backend/tests/test_rca_calc.py"],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "100% (5/5 flows)"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend endpoints: /api/holidays, /api/calculate, /api/cui-lookup (ANAF proxy). Sample CUI for tests: 27416331 (M&T AUTOSERVICE SRL, SIBIU). Sample PDFs at /tmp/pdfs/nc.pdf and /tmp/pdfs/polita.pdf (also downloadable from customer-assets-39nsmqrw). Key testids: calculeaza-rent-button, total-zile-rent-result, total-suma-ron-result, valoare-reparatie-result, cronologie-list, letter-textarea, lookup-cesionar-cui-button, lookup-rep-cui-button, lookup-rent-cui-button, cui-cesionar-input, rep-cui-input, rent-cui-input, nume-cesionar-input, adresa-cesionar-input, rep-emitent-input, rent-emitent-input, pdf-file-input, export-pdf-button, add-reconstatare-button, add-comanda-piese-button, culpa-start-input-{i}, culpa-end-input-{i}. Form is prefilled with sample dosar so fresh Calculeaza yields 15 zile immediately."
+}

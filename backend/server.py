@@ -1,17 +1,21 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
+from datetime import date
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
+import httpx
 
 from calc import calculeaza
 from holidays_ro import DEFAULT_HOLIDAYS
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+ANAF_URL = "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva"
 
 app = FastAPI(title="Calcul Rent Auto RCA")
 api_router = APIRouter(prefix="/api")
@@ -81,6 +85,62 @@ async def calculate(req: CalcRequest):
     payload["holidays"] = [h if isinstance(h, dict) else h.model_dump() for h in payload.get("holidays", [])]
     payload["culpa_periods"] = [c if isinstance(c, dict) else c.model_dump() for c in payload.get("culpa_periods", [])]
     return calculeaza(payload)
+
+
+class CuiRequest(BaseModel):
+    cui: str
+
+
+def _join_adresa(a: dict) -> str:
+    parts = [
+        a.get("sdenumire_Strada"), a.get("snumar_Strada"),
+        a.get("sdenumire_Localitate"), a.get("sdenumire_Judet"),
+        a.get("scod_Postal"),
+    ]
+    return ", ".join(str(x).strip() for x in parts if x and str(x).strip())
+
+
+@api_router.post("/cui-lookup")
+async def cui_lookup(req: CuiRequest):
+    cui = (req.cui or "").strip().upper()
+    if cui.startswith("RO"):
+        cui = cui[2:]
+    cui = "".join(ch for ch in cui if ch.isdigit())
+    if not (2 <= len(cui) <= 10):
+        raise HTTPException(status_code=422, detail="CUI invalid (2-10 cifre)")
+
+    payload = [{"cui": int(cui), "data": date.today().isoformat()}]
+    headers = {"Content-Type": "application/json", "Accept": "application/json",
+               "User-Agent": "calcul-rent-rca/1.0"}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(ANAF_URL, json=payload, headers=headers)
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="ANAF indisponibil momentan")
+
+    if resp.status_code == 429:
+        raise HTTPException(status_code=503, detail="Limita ANAF atinsa, reincercati")
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=502, detail="Eroare server ANAF")
+    try:
+        body = resp.json()
+    except ValueError:
+        raise HTTPException(status_code=502, detail="Raspuns ANAF invalid")
+
+    found = body.get("found") or []
+    if not found:
+        raise HTTPException(status_code=404, detail="CUI negasit la ANAF")
+
+    rec = found[0]
+    general = rec.get("date_generale") or {}
+    office = rec.get("adresa_sediu_social") or {}
+    return {
+        "cui": str(general.get("cui", cui)),
+        "denumire": general.get("denumire") or "",
+        "adresa": (general.get("adresa") or _join_adresa(office) or "").strip(),
+        "judet": office.get("sdenumire_Judet") or "",
+        "localitate": office.get("sdenumire_Localitate") or "",
+    }
 
 
 app.include_router(api_router)
