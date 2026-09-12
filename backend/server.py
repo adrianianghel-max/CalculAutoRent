@@ -22,6 +22,12 @@ class Holiday(BaseModel):
     name: str
 
 
+class CulpaPeriod(BaseModel):
+    label: str = "culpa"
+    start: Optional[str] = None
+    end: Optional[str] = None
+
+
 class CalcRequest(BaseModel):
     nr_dosar: str = ""
     marca_pagubit: str = ""
@@ -50,10 +56,7 @@ class CalcRequest(BaseModel):
     rent_end: Optional[str] = None
     rep_start: Optional[str] = None
     rep_end: Optional[str] = None
-    rec1_start: Optional[str] = None
-    rec1_end: Optional[str] = None
-    rec2_start: Optional[str] = None
-    rec2_end: Optional[str] = None
+    culpa_periods: List[CulpaPeriod] = []
 
     motivare_reparatie: str = ""
     observatii: str = ""
@@ -76,6 +79,7 @@ async def get_holidays():
 async def calculate(req: CalcRequest):
     payload = req.model_dump()
     payload["holidays"] = [h if isinstance(h, dict) else h.model_dump() for h in payload.get("holidays", [])]
+    payload["culpa_periods"] = [c if isinstance(c, dict) else c.model_dump() for c in payload.get("culpa_periods", [])]
     return calculeaza(payload)
 
 

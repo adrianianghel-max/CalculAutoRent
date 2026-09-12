@@ -105,22 +105,21 @@ def calculeaza(payload: dict) -> dict:
     rent_end = parse_date(payload.get("rent_end"))
     rep_start = parse_date(payload.get("rep_start"))
     rep_end = parse_date(payload.get("rep_end"))
-    rec1_start = parse_date(payload.get("rec1_start"))
-    rec1_end = parse_date(payload.get("rec1_end"))
-    rec2_start = parse_date(payload.get("rec2_start"))
-    rec2_end = parse_date(payload.get("rec2_end"))
 
-    # zile culpabile (reconstatare / comanda piese)
+    # perioade de culpa dinamice (reconstatare N / comanda piese N ...)
+    culpa_periods = []
+    for p in payload.get("culpa_periods", []):
+        ps = parse_date(p.get("start"))
+        pe = parse_date(p.get("end"))
+        label = str(p.get("label", "") or "culpa").strip() or "culpa"
+        if ps and pe and pe >= ps:
+            culpa_periods.append({"label": label, "start": ps, "end": pe})
+
+    # zile culpabile (perioadele care se intersecteaza se numara o singura data)
     zile_culpa = {}
-    if rec1_start and rec1_end:
-        for d in daterange(rec1_start, rec1_end):
-            zile_culpa[d] = "reconstatare"
-    if rec2_start and rec2_end:
-        for d in daterange(rec2_start, rec2_end):
-            zile_culpa[d] = "comanda piese"
-
-    zile_rec1 = (rec1_end - rec1_start).days + 1 if (rec1_start and rec1_end) else 0
-    zile_rec2 = (rec2_end - rec2_start).days + 1 if (rec2_start and rec2_end) else 0
+    for p in culpa_periods:
+        for d in daterange(p["start"], p["end"]):
+            zile_culpa.setdefault(d, p["label"])
 
     # zile libere legale
     zile_libere = {}
@@ -213,10 +212,9 @@ def calculeaza(payload: dict) -> dict:
         L.append(f"Perioada rent : {fmt_date(rent_start)} - {fmt_date(rent_end)} total {rent_total} zile")
     if rep_start and rep_end:
         L.append(f"Perioada rep : {fmt_date(rep_start)} - {fmt_date(rep_end)} total {rep_total} zile")
-    if rec1_start and rec1_end:
-        L.append(f"Perioada rec : {fmt_date(rec1_start)} - {fmt_date(rec1_end)} total {zile_rec1} zile")
-    if rec2_start and rec2_end:
-        L.append(f"Perioada comanda piese : {fmt_date(rec2_start)} - {fmt_date(rec2_end)} total {zile_rec2} zile")
+    for p in culpa_periods:
+        n = (p["end"] - p["start"]).days + 1
+        L.append(f"Perioada {p['label']} : {fmt_date(p['start'])} - {fmt_date(p['end'])} total {n} zile")
     L.append(f"Timp manopera tinichigerie : {trim(ore_tini)} h")
     L.append(f"Timp manopera vopsitorie : {trim(ore_vops)} h")
     L.append(f"TOTAL ORE MANOPERA : {trim(ore_total)} h")

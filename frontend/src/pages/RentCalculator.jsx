@@ -15,6 +15,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   RotateCcw,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +124,43 @@ export default function RentCalculator() {
     saveForm(next);
   };
 
+  const culpaTypeName = (type) => (type === "comanda_piese" ? "Comandă piese" : "Reconstatare");
+  const culpaLabelPlain = (type) => (type === "comanda_piese" ? "comanda piese" : "reconstatare");
+
+  // numar in cadrul aceluiasi tip, pastrand ordinea listei
+  const culpaNumber = (list, idx) =>
+    list.slice(0, idx + 1).filter((p) => p.type === list[idx].type).length;
+
+  const addCulpa = (type) => {
+    const next = {
+      ...form,
+      culpa_periods: [
+        ...(form.culpa_periods || []),
+        { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, start: "", end: "" },
+      ],
+    };
+    setForm(next);
+    saveForm(next);
+  };
+
+  const updateCulpa = (id, key, value) => {
+    const next = {
+      ...form,
+      culpa_periods: (form.culpa_periods || []).map((p) => (p.id === id ? { ...p, [key]: value } : p)),
+    };
+    setForm(next);
+    saveForm(next);
+  };
+
+  const removeCulpa = (id) => {
+    const next = {
+      ...form,
+      culpa_periods: (form.culpa_periods || []).filter((p) => p.id !== id),
+    };
+    setForm(next);
+    saveForm(next);
+  };
+
   const calcula = async () => {
     setLoading(true);
     try {
@@ -136,6 +175,13 @@ export default function RentCalculator() {
         pret_facturat: parseFloat(form.pret_facturat) || 0,
         pret_oferta: parseFloat(form.pret_oferta) || 0,
         zile_facturate: parseFloat(form.zile_facturate) || 0,
+        culpa_periods: (form.culpa_periods || [])
+          .filter((p) => p.start && p.end)
+          .map((p, idx, arr) => ({
+            label: `${culpaLabelPlain(p.type)} ${arr.slice(0, idx + 1).filter((q) => q.type === p.type).length}`,
+            start: p.start,
+            end: p.end,
+          })),
         holidays,
       };
       const r = await axios.post(`${API}/calculate`, payload);
@@ -315,23 +361,93 @@ export default function RentCalculator() {
                 </Field>
               </div>
               <Separator className="my-4" />
-              <p className="mb-3 text-xs font-medium text-muted-foreground">
-                Perioade de culpa (optional) — se adauga integral la zilele de rent
-              </p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Reconstatare - inceput" id="rec1_start">
-                  <Input id="rec1_start" type="date" value={form.rec1_start} onChange={set("rec1_start")} data-testid="rec1-start-input" />
-                </Field>
-                <Field label="Reconstatare - sfarsit" id="rec1_end">
-                  <Input id="rec1_end" type="date" value={form.rec1_end} onChange={set("rec1_end")} data-testid="rec1-end-input" />
-                </Field>
-                <Field label="Comanda piese - inceput" id="rec2_start">
-                  <Input id="rec2_start" type="date" value={form.rec2_start} onChange={set("rec2_start")} data-testid="rec2-start-input" />
-                </Field>
-                <Field label="Comanda piese - sfarsit" id="rec2_end">
-                  <Input id="rec2_end" type="date" value={form.rec2_end} onChange={set("rec2_end")} data-testid="rec2-end-input" />
-                </Field>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Perioade de culpă (opțional) — fiecare zi se adaugă integral la zilele de rent; intersecțiile se numără o singură dată
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => addCulpa("reconstatare")}
+                    data-testid="add-reconstatare-button"
+                  >
+                    <Plus className="h-3 w-3" /> Reconstatare
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => addCulpa("comanda_piese")}
+                    data-testid="add-comanda-piese-button"
+                  >
+                    <Plus className="h-3 w-3" /> Comandă piese
+                  </Button>
+                </div>
               </div>
+
+              {(form.culpa_periods || []).length === 0 ? (
+                <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-4 text-center text-[11px] text-muted-foreground">
+                  Nicio perioadă de culpă adăugată. Folosește butoanele de mai sus pentru a adăuga oricâte perioade (Reconstatare 1, 2… / Comandă piese 1, 2…).
+                </p>
+              ) : (
+                <div className="space-y-3" data-testid="culpa-periods-list">
+                  {(form.culpa_periods || []).map((p, idx, arr) => (
+                    <div
+                      key={p.id}
+                      className="rounded-lg border bg-muted/20 p-3"
+                      data-testid={`culpa-period-row-${idx}`}
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <span
+                          className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                            p.type === "comanda_piese"
+                              ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900"
+                              : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900"
+                          }`}
+                          data-testid={`culpa-period-label-${idx}`}
+                        >
+                          {culpaTypeName(p.type)} {culpaNumber(arr, idx)}
+                        </span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeCulpa(p.id)}
+                          data-testid={`remove-culpa-period-${idx}`}
+                          aria-label="Sterge perioada"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Field label="Început" id={`culpa_start_${idx}`}>
+                          <Input
+                            id={`culpa_start_${idx}`}
+                            type="date"
+                            value={p.start}
+                            onChange={(e) => updateCulpa(p.id, "start", e.target.value)}
+                            data-testid={`culpa-start-input-${idx}`}
+                          />
+                        </Field>
+                        <Field label="Sfârșit" id={`culpa_end_${idx}`}>
+                          <Input
+                            id={`culpa_end_${idx}`}
+                            type="date"
+                            value={p.end}
+                            onChange={(e) => updateCulpa(p.id, "end", e.target.value)}
+                            data-testid={`culpa-end-input-${idx}`}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Section>
 
             <div className="flex flex-wrap items-center gap-3">

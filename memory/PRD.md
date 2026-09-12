@@ -33,6 +33,16 @@ oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionis
 - Verificat: sample => 15 zile, 5445 lei, 39347.19 lei, 9 zile reparatie — identic cu Excel.
 - Testat: 17/17 backend + frontend 100%.
 
+## Implemented (2026-06-12)
+- Perioade de culpa DINAMICE: butoane "+ Reconstatare" / "+ Comanda piese" adauga oricate
+  randuri, numerotate automat per tip (Reconstatare 1,2.../Comanda piese 1,2...), fiecare cu
+  data inceput/sfarsit si buton de stergere. Payload: `culpa_periods: [{label,start,end}]`.
+- Fiecare zi dintr-o perioada de culpa se adauga integral la zilele de rent (ca vechiul rec1);
+  perioadele care se intersecteaza se numara O SINGURA DATA (setdefault pe dict de zile).
+- Scrisoarea listeaza "Perioada <label> : start - sfarsit total N zile" pentru fiecare perioada.
+- calc.py/server.py refactorizate (eliminat rec1_*/rec2_*, adaugat model CulpaPeriod).
+- Testat frontend 100% (iteration_2.json): add/remove/renumerotare, calcul, cronologie, overlap dedup.
+
 ## Backlog / Next (P1/P2)
 - P1: Export PDF al solicitarii; salvare/istoric dosare (daca se doreste ulterior).
 - P1: Trimitere email server-side (Resend/SendGrid) in loc de mailto.

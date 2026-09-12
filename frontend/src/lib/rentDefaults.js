@@ -35,10 +35,7 @@ export const DEFAULT_FORM = {
   rent_end: "2026-08-14",
   rep_start: "2026-07-14",
   rep_end: "2026-08-14",
-  rec1_start: "",
-  rec1_end: "",
-  rec2_start: "",
-  rec2_end: "",
+  culpa_periods: [],
 
   motivare_reparatie: "cf. deviz Audatex refacut. Abuz rep adaos la piese si ora de manopera.",
   observatii: DEFAULT_OBSERVATII,
