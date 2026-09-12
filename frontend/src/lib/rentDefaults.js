@@ -80,6 +80,18 @@ export const DEFAULT_FORM = {
   semnatura: DEFAULT_SEMNATURA,
 };
 
+// Formular gol (start curat, fara date inventate). Pastreaza doar constante generice.
+export const EMPTY_FORM = Object.keys(DEFAULT_FORM).reduce((acc, k) => {
+  acc[k] = "";
+  return acc;
+}, {});
+EMPTY_FORM.culpa_periods = [];
+EMPTY_FORM.tva_percent = "21";
+EMPTY_FORM.tva_label = "CU TVA";
+EMPTY_FORM.status_deplasare = "NEDEPLASABIL";
+EMPTY_FORM.observatii = DEFAULT_OBSERVATII;
+EMPTY_FORM.semnatura = DEFAULT_SEMNATURA;
+
 const HOLIDAY_KEY = "rca_holidays_v1";
 
 export function loadHolidays(fallback = []) {

@@ -16,8 +16,97 @@ export async function readPdfText(file) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+// ---------------- OCR local (tesseract.js), model "ron" inclus offline ----------------
+const OCR_SCALE = 3;
+let _ocrWorker = null;
+let _ocrLoading = null;
+
+async function getOcrWorker() {
+  if (_ocrWorker) return _ocrWorker;
+  if (_ocrLoading) return _ocrLoading;
+  _ocrLoading = (async () => {
+    const { createWorker } = await import("tesseract.js");
+    const base = `${process.env.PUBLIC_URL || ""}`;
+    const worker = await createWorker("ron", 1, {
+      workerPath: `${base}/tesseract/worker.min.js`,
+      corePath: `${base}/tesseract/`,
+      langPath: `${base}/tessdata`,
+      gzip: true,
+    });
+    _ocrWorker = worker;
+    return worker;
+  })();
+  return _ocrLoading;
+}
+
+export async function terminateOcr() {
+  if (_ocrWorker) {
+    try {
+      await _ocrWorker.terminate();
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  _ocrWorker = null;
+  _ocrLoading = null;
+}
+
+function bboxOf(hl) {
+  const xs = [];
+  const ys = [];
+  if (hl.quadPoints && hl.quadPoints.length >= 8) {
+    for (let q = 0; q + 7 < hl.quadPoints.length; q += 8) {
+      for (let j = 0; j < 8; j += 2) {
+        xs.push(hl.quadPoints[q + j]);
+        ys.push(hl.quadPoints[q + j + 1]);
+      }
+    }
+  } else if (hl.rect) {
+    xs.push(hl.rect[0], hl.rect[2]);
+    ys.push(hl.rect[1], hl.rect[3]);
+  }
+  return { xmin: Math.min(...xs), xmax: Math.max(...xs), ymin: Math.min(...ys), ymax: Math.max(...ys) };
+}
+
+function pickTextInBbox(items, b) {
+  const picked = items.filter((it) => {
+    const cx = (it.x0 + it.x1) / 2;
+    const cy = (it.y0 + it.y1) / 2;
+    return cx >= b.xmin - 2 && cx <= b.xmax + 2 && cy >= b.ymin - 2 && cy <= b.ymax + 2;
+  });
+  picked.sort((a, c) => (Math.abs(a.y0 - c.y0) > 3 ? c.y0 - a.y0 : a.x0 - c.x0));
+  return picked.map((p) => p.str).join(" ").replace(/\s+/g, " ").trim();
+}
+
+async function renderPage(page, scale) {
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext("2d");
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return { canvas, viewport };
+}
+
+async function ocrCrop(worker, pageRender, b, scale) {
+  const { canvas, viewport } = pageRender;
+  const left = Math.max(0, b.xmin * scale - 6);
+  const right = Math.min(canvas.width, b.xmax * scale + 6);
+  const top = Math.max(0, viewport.height - b.ymax * scale - 6);
+  const bottom = Math.min(canvas.height, viewport.height - b.ymin * scale + 6);
+  const w = Math.max(1, right - left);
+  const h = Math.max(1, bottom - top);
+  const crop = document.createElement("canvas");
+  crop.width = w;
+  crop.height = h;
+  crop.getContext("2d").drawImage(canvas, left, top, w, h, 0, 0, w, h);
+  const { data } = await worker.recognize(crop);
+  return (data.text || "").replace(/\s+/g, " ").trim();
+}
+
 // Extrage textul aflat SUB adnotarile de tip Highlight (marcaje galbene reale).
-export async function readHighlights(file) {
+// Pentru PDF-uri scanate (fara strat de text), face OCR local doar pe zona marcata daca ocr=true.
+export async function readHighlights(file, { ocr = false } = {}) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   const results = [];
@@ -37,28 +126,16 @@ export async function readHighlights(file) {
         const h = it.height || Math.abs(tx[3]) || 8;
         return { str: it.str, x0: x, x1: x + w, y0: y, y1: y + h };
       });
+
+    let pageRender = null;
     for (const hl of highlights) {
-      // quadPoints: [x1,y1,x2,y2,x3,y3,x4,y4] pe grupuri de 8; fallback la rect
-      const quads = [];
-      if (hl.quadPoints && hl.quadPoints.length >= 8) {
-        for (let q = 0; q + 7 < hl.quadPoints.length; q += 8) {
-          const xs = [hl.quadPoints[q], hl.quadPoints[q + 2], hl.quadPoints[q + 4], hl.quadPoints[q + 6]];
-          const ys = [hl.quadPoints[q + 1], hl.quadPoints[q + 3], hl.quadPoints[q + 5], hl.quadPoints[q + 7]];
-          quads.push({ xmin: Math.min(...xs), xmax: Math.max(...xs), ymin: Math.min(...ys), ymax: Math.max(...ys) });
-        }
-      } else if (hl.rect) {
-        quads.push({ xmin: hl.rect[0], xmax: hl.rect[2], ymin: hl.rect[1], ymax: hl.rect[3] });
+      const b = bboxOf(hl);
+      let txt = pickTextInBbox(items, b);
+      if (!txt && ocr) {
+        const worker = await getOcrWorker();
+        if (!pageRender) pageRender = await renderPage(page, OCR_SCALE);
+        txt = await ocrCrop(worker, pageRender, b, OCR_SCALE);
       }
-      const picked = [];
-      for (const it of items) {
-        const cx = (it.x0 + it.x1) / 2;
-        const cy = (it.y0 + it.y1) / 2;
-        if (quads.some((qd) => cx >= qd.xmin - 2 && cx <= qd.xmax + 2 && cy >= qd.ymin - 2 && cy <= qd.ymax + 2)) {
-          picked.push(it);
-        }
-      }
-      picked.sort((a, b) => (Math.abs(a.y0 - b.y0) > 3 ? b.y0 - a.y0 : a.x0 - b.x0));
-      const txt = picked.map((p) => p.str).join(" ").replace(/\s+/g, " ").trim();
       if (txt) results.push(txt);
     }
   }
@@ -115,12 +192,26 @@ export function extractPolita(text) {
   return out;
 }
 
+// Clasifica marcajele galbene: numere pure (CUI, cu/fara RO) vs text (adresa etc.).
+export function classifyHighlights(highlights) {
+  const cuis = [];
+  const addresses = [];
+  for (const raw of highlights) {
+    const h = (raw || "").replace(/\s+/g, " ").trim();
+    if (!h) continue;
+    const compact = h.replace(/\s+/g, "");
+    const cuiM = compact.match(/^(?:RO)?(\d{2,10})$/i);
+    if (cuiM) {
+      cuis.push(cuiM[1]);
+      continue;
+    }
+    const letters = (h.match(/[A-Za-zĂÂÎȘȚăâîșț]/g) || []).length;
+    if (letters >= 3) addresses.push(h);
+  }
+  return { cuis, addresses };
+}
+
 // Extrage CUI-urile (2-10 cifre) din marcajele galbene, in ordine.
 export function extractCuisFromHighlights(highlights) {
-  const cuis = [];
-  for (const h of highlights) {
-    const m = h.match(/\b(?:RO)?\s*(\d{2,10})\b/i);
-    if (m) cuis.push(m[1]);
-  }
-  return cuis;
+  return classifyHighlights(highlights).cuis;
 }

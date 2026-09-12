@@ -32,6 +32,7 @@ import { Separator } from "@/components/ui/separator";
 import { HolidayManager } from "@/components/HolidayManager";
 import {
   DEFAULT_FORM,
+  EMPTY_FORM,
   DEFAULT_EMAIL_TO,
   loadForm,
   saveForm,
@@ -44,7 +45,8 @@ import {
   readHighlights,
   extractNc,
   extractPolita,
-  extractCuisFromHighlights,
+  classifyHighlights,
+  terminateOcr,
 } from "@/lib/pdfExtract";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -198,6 +200,7 @@ export default function RentCalculator() {
     setParsing(true);
     const changes = {};
     const cuis = [];
+    let pagubitAddr = "";
     const filled = [];
     try {
       for (const file of files) {
@@ -225,15 +228,18 @@ export default function RentCalculator() {
           const pol = extractPolita(text);
           if (pol.data_emitere_rca_iso) { changes.data_emitere_rca = pol.data_emitere_rca_iso; filled.push("data emitere RCA"); }
         }
-        // marcaje galbene -> CUI-uri (in ordine)
+        // marcaje galbene -> CUI-uri (numere) si adresa pagubit (text)
         try {
-          const hl = await readHighlights(file);
-          extractCuisFromHighlights(hl).forEach((c) => cuis.push(c));
+          const hl = await readHighlights(file, { ocr: true });
+          const { cuis: c, addresses } = classifyHighlights(hl);
+          c.forEach((x) => cuis.push(x));
+          if (!pagubitAddr && addresses.length) pagubitAddr = addresses[0];
         } catch (err) {
-          /* fara highlight-uri */
+          /* fara highlight-uri sau PDF scanat fara strat de text */
         }
       }
 
+      if (pagubitAddr) { changes.adresa_pagubit = pagubitAddr; filled.push("adresa pagubit"); }
       if (cuis.length >= 1) { changes.cui_cesionar = cuis[0]; filled.push("CUI 1 (cesionar)"); }
       if (cuis.length >= 2) { changes.rep_cui = cuis[1]; filled.push("CUI 2 (reparatie)"); }
       if (cuis.length >= 3) { changes.rent_cui = cuis[2]; filled.push("CUI 3 (rent)"); }
@@ -245,6 +251,7 @@ export default function RentCalculator() {
         toast.info("Nu am gasit campuri recunoscute in fisierele incarcate.");
       }
     } finally {
+      terminateOcr().catch(() => {});
       setParsing(false);
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -320,6 +327,15 @@ export default function RentCalculator() {
     setResult(null);
     setLetter("");
     toast.success("Formular resetat la exemplul implicit.");
+  };
+
+  const clearForm = () => {
+    const empty = { ...EMPTY_FORM, culpa_periods: [] };
+    setForm(empty);
+    saveForm(empty);
+    setResult(null);
+    setLetter("");
+    toast.success("Formular golit. Poți culege datele din PDF.");
   };
 
   const money = (x) =>
@@ -627,6 +643,9 @@ export default function RentCalculator() {
               </Button>
               <Button variant="ghost" onClick={resetForm} className="gap-2 text-muted-foreground" data-testid="reset-form-button">
                 <RotateCcw className="h-3.5 w-3.5" /> Resetează formularul
+              </Button>
+              <Button variant="ghost" onClick={clearForm} className="gap-2 text-muted-foreground" data-testid="clear-form-button">
+                <Trash2 className="h-3.5 w-3.5" /> Golește formular
               </Button>
             </div>
           </div>

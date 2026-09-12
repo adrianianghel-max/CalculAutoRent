@@ -39,8 +39,14 @@ oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionis
   nr dosar, nr inmatriculare, marca/model, nume pagubit, data eveniment, data notificare/avizare si
   data emitere RCA ("Date Given"). Extragere CUI-uri din marcaje galbene (highlight) in ordine.
 - Cautare CUI la ANAF (API oficial v9) prin proxy backend -> completeaza nume+adresa+judet.
-- Extragere CUI din marcaje galbene: trateaza si prefixul "RO" (ex. RO37686707 -> 37686707);
-  validat pe cd.pdf real (2 highlight-uri: RO37686707 -> cesionar, 40807221 -> reparatie).
+- Extragere din marcaje galbene (highlight):
+  - CUI (numere, inclusiv prefix "RO", ex. RO37686707 -> 37686707) mapate in ordine: 1->cesionar, 2->reparatie, 3->rent.
+  - Adresa pagubit (text) din highlight, pentru PDF-uri cu strat de text.
+  - OCR LOCAL (tesseract.js, model "ron" inclus offline in public/tessdata) DOAR pe zona marcata,
+    pentru PDF-uri SCANATE fara strat de text (ex. acte.pdf). Ruleaza 100% in browser (GDPR),
+    documentul nu paraseste dispozitivul. Ce nu se poate extrage ramane necompletat (fara date inventate).
+  - Fisiere OCR servite local din public/tesseract (toate variantele: plain/simd/lstm/simd-lstm) si public/tessdata.
+- Buton "Goleste formular" (start curat) pe langa "Reseteaza formularul" (exemplu implicit).
 - Export PDF al scrisorii (jsPDF).
 - Testat: backend 20/20, frontend 5/5 fluxuri (iteration_3.json). Paritate calcul JS vs Excel confirmata (15 zile / 5445 / 39347.19).
 

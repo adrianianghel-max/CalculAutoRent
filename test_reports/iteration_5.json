@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend-only retest covering local OCR on scanned PDF, GDPR no-network, cd.pdf text-layer CUI extraction, clear-form button, and regression calc. Found and fixed a critical asset bug: /public/tesseract/ was missing the LSTM wasm variants (tesseract-core-simd-lstm.wasm.js and companions) that tesseract.js v5 requires when loading the Romanian LSTM model. Copied the missing core files from node_modules/tesseract.js-core into public/tesseract. After fix, all 5 scenarios pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "OCR on scanned PDF (acte.pdf)",
+        "issue": "BEFORE FIX: Tesseract worker crashed at runtime with NetworkError: Failed to execute importScripts on WorkerGlobalScope: The script '/tesseract/tesseract-core-simd-lstm.wasm.js' failed to load. Reason: public/tesseract/ only contained non-LSTM core variants; tesseract.js v5 automatically picks the *-lstm* build for the LSTM-trained ron model. FIXED by copying tesseract-core-lstm.js, tesseract-core-lstm.wasm(.js), tesseract-core-simd-lstm.js, tesseract-core-simd-lstm.wasm(.js) from node_modules/tesseract.js-core into public/tesseract/.",
+        "affected_selectors": ["[data-testid=\"adresa-pagubit-input\"]", "[data-testid=\"pdf-file-input\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Ensure the missing LSTM wasm variants (tesseract-core-lstm.*, tesseract-core-simd-lstm.*) remain committed under frontend/public/tesseract/ so OCR keeps working after redeploy. Consider adding a build-time copy step (postinstall script) that copies /node_modules/tesseract.js-core/tesseract-core*.* to /public/tesseract/ automatically to prevent future regressions."
+  ],
+  "critical_code_review_comments": [
+    "pdfExtract.js hardcodes corePath '/tesseract/'. The set of files that tesseract.js may request at runtime depends on lang model type (LSTM vs legacy) and SIMD support — the app must ship all four variants (plain, simd, lstm, simd-lstm) or the OCR silently fails on some environments. Only 2 of 4 were shipped originally.",
+    "OCR errors are swallowed – on the initial failed run the user only saw the Emergent runtime overlay, no in-app toast. Consider wrapping the recognize call in try/catch and surfacing 'OCR indisponibil' toast so users understand what happened.",
+    "clearForm persists EMPTY_FORM to localStorage, meaning after clear + reload the demo defaults never come back. Consider a separate resetForm button (already exists as 'Resetează formularul') documented near the clear-form flow so users know how to restore demo values."
+  ],
+  "updated_files": [
+    "/app/frontend/public/tesseract/tesseract-core-lstm.js",
+    "/app/frontend/public/tesseract/tesseract-core-lstm.wasm",
+    "/app/frontend/public/tesseract/tesseract-core-lstm.wasm.js",
+    "/app/frontend/public/tesseract/tesseract-core-simd-lstm.js",
+    "/app/frontend/public/tesseract/tesseract-core-simd-lstm.wasm",
+    "/app/frontend/public/tesseract/tesseract-core-simd-lstm.wasm.js"
+  ],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100% (5/5 after fix)"},
+  "test_credentials": "None required",
+  "seed_data_creation": "Downloaded sample PDFs to /tmp/pdfs/acte.pdf and /tmp/pdfs/cd.pdf for upload testing.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Verified: (1) cd.pdf text-layer -> cui-cesionar=37686707, rep-cui=40807221 (populated <2s, no backend POST). (2) acte.pdf scanned -> OCR via tesseract.js filled adresa-pagubit with plausible Romanian address text ('Ste. SOVEJA Nr.45 B)I2 Sc.A Ap.I1 min. SLOBOZIA Jud.') within ~2s after worker warmed up (~15-30s cold start expected on first hit). Success toast 'Date culese din PDF: adresa pagubit.' shown. (3) GDPR: only /__emergent_overlay__ dev POSTs seen; NO backend calls carrying PDF data. (4) clear-form empties nr-dosar, nume-pagubit, marca-model, adresa-pagubit; tva-percent stays '21'; result panel returns to 'Rezultatul apare aici'. (5) Regression with fresh localStorage and default form: total-zile-rent=15, total-suma-ron=5.445,00, valoare-reparatie=39.347,19. IMPORTANT: pdf-file-input has class='hidden' — use state='attached' when waiting on that selector. Also clearForm persists to localStorage; to test regression you must clear localStorage before reload.",
+  "rca of the issue": "Root cause: tesseract.js v5's createWorker dynamically loads the appropriate wasm core based on lang model. Romanian traineddata (ron) is an LSTM model, so the worker requests tesseract-core-simd-lstm.wasm.js from the configured corePath. The developer only copied the non-LSTM variants to /public/tesseract/, so the fetch 404'd, triggering a WorkerGlobalScope importScripts NetworkError before recognize() could run. Reproduction: localStorage.clear() -> reload -> click 'Golește formular' (to empty adresa) -> upload acte.pdf on [data-testid=pdf-file-input] -> observe Emergent runtime error overlay. Mitigation: copied the six missing LSTM core files from node_modules/tesseract.js-core into frontend/public/tesseract/. Long-term: add a postinstall/build script that mirrors node_modules/tesseract.js-core/*.{js,wasm} into public/tesseract/ to keep the offline bundle in sync with the installed tesseract.js version."
+}
