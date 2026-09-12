@@ -34,7 +34,7 @@ function trim(x) {
 
 function fmtDate(d) {
   const p = (n) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
 const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;

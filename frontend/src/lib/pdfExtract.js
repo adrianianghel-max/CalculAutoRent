@@ -142,17 +142,14 @@ export async function readHighlights(file, { ocr = false } = {}) {
   return results;
 }
 
-function isoToRo(s) {
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return m ? `${m[3]}.${m[2]}.${m[1]}` : s;
-}
-function toIso(dmy) {
-  // DD.MM.YYYY sau DD/MM/YYYY -> YYYY-MM-DD (pt. input type=date)
-  const m = dmy.match(/^(\d{2})[.\/](\d{2})[.\/](\d{4})$/);
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+function toDdmmyyyy(s) {
+  let m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/))) return `${m[3]}/${m[2]}/${m[1]}`;
+  if ((m = s.match(/^(\d{2})[.\/](\d{2})[.\/](\d{4})$/))) return `${m[1]}/${m[2]}/${m[3]}`;
+  return s;
 }
 
-// Extrage campurile din nc.pdf (procesul-verbal de constatare).
+// Extrage campurile din nc.pdf (procesul-verbal de constatare). Datele -> dd/mm/yyyy.
 export function extractNc(text) {
   const out = {};
   let m;
@@ -162,17 +159,11 @@ export function extractNc(text) {
     out.marca_model = m[1].replace(/\s+/g, " ").trim();
   if ((m = text.match(/Proprietar[^:]*:\s*(.+?)\s+Dat[ăa]?\b/i)))
     out.nume_pagubit = m[1].replace(/\s+/g, " ").trim();
-  if ((m = text.match(/Data\s+evenimentului:\s*(\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4})/i))) {
-    const v = isoToRo(m[1]);
-    out.data_eveniment_ro = v;
-    out.data_eveniment_iso = toIso(v);
-  }
-  if ((m = text.match(/Dat[ăa]?\s+notificare\s*:?\s*(\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4})/i)) ||
-      (m = text.match(/Data\s+aviz[^\s]*\s*RCA[^0-9]*(\d{2}\.\d{2}\.\d{4}|\d{4}-\d{2}-\d{2})/i))) {
-    const v = isoToRo(m[1]);
-    out.data_notificare_ro = v;
-    out.data_notificare_iso = toIso(v);
-  }
+  if ((m = text.match(/Data\s+evenimentului:\s*(\d{4}-\d{2}-\d{2}|\d{2}[.\/]\d{2}[.\/]\d{4})/i)))
+    out.data_eveniment = toDdmmyyyy(m[1]);
+  if ((m = text.match(/Dat[ăa]?\s+notificare\s*:?\s*(\d{4}-\d{2}-\d{2}|\d{2}[.\/]\d{2}[.\/]\d{4})/i)) ||
+      (m = text.match(/Data\s+aviz[^\s]*\s*RCA[^0-9]*(\d{2}[.\/]\d{2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})/i)))
+    out.data_avizare = toDdmmyyyy(m[1]);
   return out;
 }
 
@@ -183,11 +174,7 @@ export function extractPolita(text) {
   if (pos >= 0) {
     const after = text.slice(pos + "date given".length, pos + "date given".length + 500);
     const m = after.match(/(\d{2}\/\d{2}\/\d{4})/);
-    if (m) {
-      const v = m[1].replace(/\//g, ".");
-      out.data_emitere_rca_ro = v;
-      out.data_emitere_rca_iso = toIso(v);
-    }
+    if (m) out.data_emitere_rca = m[1];
   }
   return out;
 }

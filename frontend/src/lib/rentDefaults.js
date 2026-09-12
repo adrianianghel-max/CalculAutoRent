@@ -17,13 +17,13 @@ export const DEFAULT_FORM = {
   nume_cesionar: "M & T AUTOSERVICE",
   cui_cesionar: "27416331",
   adresa_cesionar: "STR. MASINISTILOR 23 JUD. SIBIU, LOC. SIBIU",
-  data_eveniment: "2026-07-11",
-  data_depunere_cd: "2026-08-26",
+  data_eveniment: "11/07/2026",
+  data_depunere_cd: "26/08/2026",
   status_deplasare: "NEDEPLASABIL",
 
   // ---- DATE FACTURA REPARATIE ----
   rep_factura_nr: "2026593",
-  rep_factura_data: "2026-08-26",
+  rep_factura_data: "26/08/2026",
   rep_emitent: "M & T AUTOSERVICE",
   rep_cui: "27416331",
   rep_localitate: "SIBIU",
@@ -51,7 +51,7 @@ export const DEFAULT_FORM = {
 
   // ---- DATE FACTURA LIPSA DE FOLOSINTA (RENT) ----
   rent_factura_nr: "2026594",
-  rent_factura_data: "2026-08-26",
+  rent_factura_data: "26/08/2026",
   rent_emitent: "M & T AUTOSERVICE",
   rent_cui: "27416331",
   rent_localitate: "SIBIU",
@@ -62,16 +62,16 @@ export const DEFAULT_FORM = {
   pret_facturat: "363",
   auto_oferta_marca: "MERCEDES A",
   pret_oferta: "541.18",
-  data_emitere_rca: "2026-06-11",
+  data_emitere_rca: "11/06/2026",
   tva_label: "CU TVA",
 
   // ---- PERIOADE ----
-  data_avizare: "2026-07-14",
-  data_constatare: "2026-07-15",
-  rent_start: "2026-07-14",
-  rent_end: "2026-08-14",
-  rep_start: "2026-07-14",
-  rep_end: "2026-08-14",
+  data_avizare: "14/07/2026",
+  data_constatare: "15/07/2026",
+  rent_start: "14/07/2026",
+  rent_end: "14/08/2026",
+  rep_start: "14/07/2026",
+  rep_end: "14/08/2026",
   culpa_periods: [],
 
   // ---- SCRISOARE ----
@@ -112,7 +112,7 @@ export function saveHolidays(list) {
   }
 }
 
-const FORM_KEY = "rca_form_v1";
+const FORM_KEY = "rca_form_v2";
 
 export function loadForm() {
   try {

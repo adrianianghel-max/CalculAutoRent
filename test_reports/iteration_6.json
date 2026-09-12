@@ -1,0 +1,33 @@
+{
+  "summary": "Retested UI changes for RCA Rent Calculator: dd/mm/yyyy date inputs everywhere, auto-format typing, Status & TVA shadcn Selects, PDF gather producing dd/mm/yyyy, and Reconstatare culpa period. All 6 requested scenarios pass end-to-end via DOM assertions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "default_dates_ddmmyyyy": "PASS - data_avizare=14/07/2026, rent_start=14/07/2026, rent_end=14/08/2026, rep_start=14/07/2026, data_eveniment=11/07/2026, data_emitere_rca=11/06/2026",
+    "calc_kpis": "PASS - zile_rent=15, suma=5.445,00, valoare_reparatie=39.347,19",
+    "letter_dates_use_slashes": "PASS - contains '14/07/2026'; no dots ('14.07.2026') and no ISO ('2026-07-14')",
+    "cronologie_uses_slashes": "PASS - '14/07/2026' present in cronologie-list",
+    "auto_format_typing_rent_start": "PASS - typing '01022026' produced '01/02/2026'",
+    "status_default_and_dropdown": "PASS - default 'NEDEPLASABIL'; after selecting DEPLASABIL letter shows 'Calcul lipsa de folosinta dupa norma N18 dupa incetarea HG298, DEPLASABIL'",
+    "tva_default_and_dropdown": "PASS - default 'CU TVA' shown in letter; after selecting 'FĂRĂ TVA' letter contains 'FĂRĂ TVA' and no longer contains 'CU TVA'",
+    "reconstatare_period": "PASS - typing 16072026 / 18072026 auto-formats; letter contains 'Perioada reconstatare 1 : 16/07/2026 - 18/07/2026 total 3 zile'",
+    "pdf_gather_ddmmyyyy": "PASS (verified with pre-changed data_avizare=01/01/2020 to detect override) - after uploading nc.pdf+polita.pdf simultaneously: data_eveniment=11/07/2026, data_avizare=15/07/2026, data_emitere_rca=11/06/2026, nr_dosar=U21201993163"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RentCalculator.jsx is 789 lines - consider splitting into smaller components (form sections) for maintainability.",
+    "onFiles patch() uses stale closure over form; currently safe because a single patch() is called at end, but future changes should be careful.",
+    "Consider centralizing formatDateTyping + dateProps into a small reusable hook shared with culpa inputs (currently duplicated inline)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None; used sample PDFs downloaded to /tmp/rca/",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 6 confirmed dd/mm/yyyy dates, auto-format, Status/TVA shadcn Selects (with data-testid options), PDF gather (nc.pdf + polita.pdf) all working. Note when testing PDF gather: default data_avizare is 14/07/2026 and nc.pdf yields 15/07/2026 -- change the field before upload to reliably detect the override, and allow 5-15s for readHighlights/OCR to complete."
+}

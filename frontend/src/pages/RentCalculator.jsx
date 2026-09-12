@@ -29,6 +29,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { HolidayManager } from "@/components/HolidayManager";
 import {
   DEFAULT_FORM,
@@ -63,6 +70,15 @@ const CULPA_BADGE = {
   reconstatare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
   comanda_piese: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
   antifrauda: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
+};
+
+// Formateaza pe masura ce se tasteaza: cifre -> zz/ll/aaaa
+const formatDateTyping = (v) => {
+  const d = (v || "").replace(/\D/g, "").slice(0, 8);
+  let out = d.slice(0, 2);
+  if (d.length >= 3) out += "/" + d.slice(2, 4);
+  if (d.length >= 5) out += "/" + d.slice(4, 8);
+  return out;
 };
 
 function Field({ label, id, children, hint, className }) {
@@ -153,6 +169,15 @@ export default function RentCalculator() {
 
   const set = (key) => (e) => patch({ [key]: e.target.value });
 
+  const dateProps = (key, testid) => ({
+    value: form[key] || "",
+    inputMode: "numeric",
+    placeholder: "zz/ll/aaaa",
+    maxLength: 10,
+    onChange: (e) => patch({ [key]: formatDateTyping(e.target.value) }),
+    "data-testid": testid,
+  });
+
   // ---------- perioade de culpa dinamice ----------
   const culpaTypeName = (type) =>
     type === "comanda_piese" ? "Comandă piese" : type === "antifrauda" ? "Antifraudă" : "Reconstatare";
@@ -221,12 +246,12 @@ export default function RentCalculator() {
           if (nc.numar_inmatriculare) { changes.numar_inmatriculare = nc.numar_inmatriculare; filled.push("nr inmatriculare"); }
           if (nc.marca_model) { changes.marca_model = nc.marca_model; filled.push("marca/model"); }
           if (nc.nume_pagubit) { changes.nume_pagubit = nc.nume_pagubit; filled.push("nume pagubit"); }
-          if (nc.data_eveniment_iso) { changes.data_eveniment = nc.data_eveniment_iso; filled.push("data eveniment"); }
-          if (nc.data_notificare_iso) { changes.data_avizare = nc.data_notificare_iso; filled.push("data avizare/notificare"); }
+          if (nc.data_eveniment) { changes.data_eveniment = nc.data_eveniment; filled.push("data eveniment"); }
+          if (nc.data_avizare) { changes.data_avizare = nc.data_avizare; filled.push("data avizare/notificare"); }
         }
         if (looksPolita) {
           const pol = extractPolita(text);
-          if (pol.data_emitere_rca_iso) { changes.data_emitere_rca = pol.data_emitere_rca_iso; filled.push("data emitere RCA"); }
+          if (pol.data_emitere_rca) { changes.data_emitere_rca = pol.data_emitere_rca; filled.push("data emitere RCA"); }
         }
         // marcaje galbene -> CUI-uri (numere) si adresa pagubit (text)
         try {
@@ -460,13 +485,21 @@ export default function RentCalculator() {
                   <Input id="adresa_pagubit" value={form.adresa_pagubit} onChange={set("adresa_pagubit")} data-testid="adresa-pagubit-input" />
                 </Field>
                 <Field label="Dată eveniment" id="data_eveniment">
-                  <Input id="data_eveniment" type="date" value={form.data_eveniment} onChange={set("data_eveniment")} data-testid="data-eveniment-input" />
+                  <Input id="data_eveniment" {...dateProps("data_eveniment", "data-eveniment-input")} />
                 </Field>
                 <Field label="Dată depunere CD" id="data_depunere_cd">
-                  <Input id="data_depunere_cd" type="date" value={form.data_depunere_cd} onChange={set("data_depunere_cd")} data-testid="data-depunere-cd-input" />
+                  <Input id="data_depunere_cd" {...dateProps("data_depunere_cd", "data-depunere-cd-input")} />
                 </Field>
-                <Field label="Status deplasare (motivare)" id="status_deplasare" hint="ex. NEDEPLASABIL / DEPLASABIL" className="sm:col-span-2">
-                  <Input id="status_deplasare" value={form.status_deplasare} onChange={set("status_deplasare")} data-testid="status-deplasare-input" />
+                <Field label="Status deplasare (motivare)" id="status_deplasare" hint="Alege din listă" className="sm:col-span-2">
+                  <Select value={form.status_deplasare} onValueChange={(v) => patch({ status_deplasare: v })}>
+                    <SelectTrigger id="status_deplasare" data-testid="status-deplasare-select">
+                      <SelectValue placeholder="Alege" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NEDEPLASABIL" data-testid="status-nedeplasabil-option">NEDEPLASABIL</SelectItem>
+                      <SelectItem value="DEPLASABIL" data-testid="status-deplasabil-option">DEPLASABIL</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Field>
               </div>
               <Separator className="my-4" />
@@ -480,7 +513,7 @@ export default function RentCalculator() {
                   <Input id="rep_factura_nr" value={form.rep_factura_nr} onChange={set("rep_factura_nr")} data-testid="rep-factura-nr-input" />
                 </Field>
                 <Field label="Dată factură" id="rep_factura_data">
-                  <Input id="rep_factura_data" type="date" value={form.rep_factura_data} onChange={set("rep_factura_data")} data-testid="rep-factura-data-input" />
+                  <Input id="rep_factura_data" {...dateProps("rep_factura_data", "rep-factura-data-input")} />
                 </Field>
               </div>
               <div className="mt-4">
@@ -527,7 +560,7 @@ export default function RentCalculator() {
                   <Input id="rent_factura_nr" value={form.rent_factura_nr} onChange={set("rent_factura_nr")} data-testid="rent-factura-nr-input" />
                 </Field>
                 <Field label="Dată factură" id="rent_factura_data">
-                  <Input id="rent_factura_data" type="date" value={form.rent_factura_data} onChange={set("rent_factura_data")} data-testid="rent-factura-data-input" />
+                  <Input id="rent_factura_data" {...dateProps("rent_factura_data", "rent-factura-data-input")} />
                 </Field>
               </div>
               <div className="mt-4">
@@ -556,10 +589,18 @@ export default function RentCalculator() {
                   <Input id="pret_oferta" inputMode="decimal" value={form.pret_oferta} onChange={set("pret_oferta")} data-testid="pret-oferta-input" />
                 </Field>
                 <Field label="Dată emitere RCA" id="data_emitere_rca" hint="Determină automat norma">
-                  <Input id="data_emitere_rca" type="date" value={form.data_emitere_rca} onChange={set("data_emitere_rca")} data-testid="data-emitere-rca-input" />
+                  <Input id="data_emitere_rca" {...dateProps("data_emitere_rca", "data-emitere-rca-input")} />
                 </Field>
                 <Field label="TVA etichetă" id="tva_label">
-                  <Input id="tva_label" value={form.tva_label} onChange={set("tva_label")} data-testid="tva-label-input" />
+                  <Select value={form.tva_label} onValueChange={(v) => patch({ tva_label: v })}>
+                    <SelectTrigger id="tva_label" data-testid="tva-label-select">
+                      <SelectValue placeholder="Alege" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CU TVA" data-testid="tva-cu-option">CU TVA</SelectItem>
+                      <SelectItem value="FĂRĂ TVA" data-testid="tva-fara-option">FĂRĂ TVA</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Field>
               </div>
             </Section>
@@ -567,22 +608,22 @@ export default function RentCalculator() {
             <Section icon={Calendar} title="Perioade & Cronologie">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Data avizării" id="data_avizare">
-                  <Input id="data_avizare" type="date" value={form.data_avizare} onChange={set("data_avizare")} data-testid="data-avizare-input" />
+                  <Input id="data_avizare" {...dateProps("data_avizare", "data-avizare-input")} />
                 </Field>
                 <Field label="Data constatării" id="data_constatare">
-                  <Input id="data_constatare" type="date" value={form.data_constatare} onChange={set("data_constatare")} data-testid="data-constatare-input" />
+                  <Input id="data_constatare" {...dateProps("data_constatare", "data-constatare-input")} />
                 </Field>
                 <Field label="Perioada rent - început" id="rent_start">
-                  <Input id="rent_start" type="date" value={form.rent_start} onChange={set("rent_start")} data-testid="rent-start-input" />
+                  <Input id="rent_start" {...dateProps("rent_start", "rent-start-input")} />
                 </Field>
                 <Field label="Perioada rent - sfârșit" id="rent_end">
-                  <Input id="rent_end" type="date" value={form.rent_end} onChange={set("rent_end")} data-testid="rent-end-input" />
+                  <Input id="rent_end" {...dateProps("rent_end", "rent-end-input")} />
                 </Field>
                 <Field label="Perioada reparație - început" id="rep_start">
-                  <Input id="rep_start" type="date" value={form.rep_start} onChange={set("rep_start")} data-testid="rep-start-input" />
+                  <Input id="rep_start" {...dateProps("rep_start", "rep-start-input")} />
                 </Field>
                 <Field label="Perioada reparație - sfârșit" id="rep_end">
-                  <Input id="rep_end" type="date" value={form.rep_end} onChange={set("rep_end")} data-testid="rep-end-input" />
+                  <Input id="rep_end" {...dateProps("rep_end", "rep-end-input")} />
                 </Field>
               </div>
 
@@ -625,10 +666,10 @@ export default function RentCalculator() {
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label="Început" id={`culpa_start_${idx}`}>
-                          <Input id={`culpa_start_${idx}`} type="date" value={p.start} onChange={(e) => updateCulpa(p.id, "start", e.target.value)} data-testid={`culpa-start-input-${idx}`} />
+                          <Input id={`culpa_start_${idx}`} value={p.start || ""} inputMode="numeric" placeholder="zz/ll/aaaa" maxLength={10} onChange={(e) => updateCulpa(p.id, "start", formatDateTyping(e.target.value))} data-testid={`culpa-start-input-${idx}`} />
                         </Field>
                         <Field label="Sfârșit" id={`culpa_end_${idx}`}>
-                          <Input id={`culpa_end_${idx}`} type="date" value={p.end} onChange={(e) => updateCulpa(p.id, "end", e.target.value)} data-testid={`culpa-end-input-${idx}`} />
+                          <Input id={`culpa_end_${idx}`} value={p.end || ""} inputMode="numeric" placeholder="zz/ll/aaaa" maxLength={10} onChange={(e) => updateCulpa(p.id, "end", formatDateTyping(e.target.value))} data-testid={`culpa-end-input-${idx}`} />
                         </Field>
                       </div>
                     </div>
