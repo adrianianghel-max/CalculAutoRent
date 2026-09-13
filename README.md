@@ -45,7 +45,10 @@ Repo-ul trebuie sa fie disponibil pe GitHub.
 - La **backend** (`calculautorent-backend`):
   - `CORS_ORIGINS=https://<frontend-url-render>,http://localhost:3000`
 - La **frontend** (`calculautorent-frontend`):
-  - `REACT_APP_BACKEND_URL=https://<backend-url-render>`
+  - `REACT_APP_BACKEND_URL=https://<backend-url-render>` (**obligatoriu la build time**)
+
+Nota: pentru frontend static (CRA), `REACT_APP_BACKEND_URL` este incorporat in bundle in timpul `yarn build`.  
+Daca schimbi valoarea variabilei, trebuie redeploy/rebuild ca sa intre in aplicatie.
 
 ### 4) Activeaza auto-deploy
 Este deja setat in `render.yaml` (`autoDeploy: true`).  
