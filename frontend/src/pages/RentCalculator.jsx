@@ -230,7 +230,7 @@ export default function RentCalculator() {
       axios
         .get(`${apiUrl}/holidays`)
         .then((r) => setHolidays(r.data))
-        .catch(() => setHolidays([]));
+        .catch(() => setHolidays(DEFAULT_HOLIDAYS));
     }
   }, [apiUrl, ensureApiConfigured]);
 

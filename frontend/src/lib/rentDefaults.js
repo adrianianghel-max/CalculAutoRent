@@ -92,61 +92,74 @@ EMPTY_FORM.status_deplasare = "NEDEPLASABIL";
 EMPTY_FORM.observatii = DEFAULT_OBSERVATII;
 EMPTY_FORM.semnatura = DEFAULT_SEMNATURA;
 
-export const DEFAULT_HOLIDAYS = [
-  // 2025
-  { date: "2025-01-01", name: "Anul Nou" },
-  { date: "2025-01-02", name: "Anul Nou" },
-  { date: "2025-01-06", name: "Boboteaza" },
-  { date: "2025-01-07", name: "Sfantul Ioan Botezatorul" },
-  { date: "2025-01-24", name: "Unirea Principatelor Romane" },
-  { date: "2025-04-18", name: "Vinerea Mare" },
-  { date: "2025-04-20", name: "Paste ortodox" },
-  { date: "2025-04-21", name: "Paste ortodox" },
-  { date: "2025-05-01", name: "Ziua Muncii" },
-  { date: "2025-06-01", name: "Ziua Copilului" },
-  { date: "2025-06-08", name: "Rusalii" },
-  { date: "2025-06-09", name: "Rusalii" },
-  { date: "2025-08-15", name: "Adormirea Maicii Domnului" },
-  { date: "2025-11-30", name: "Sfantul Andrei" },
-  { date: "2025-12-01", name: "Ziua Nationala a Romaniei" },
-  { date: "2025-12-25", name: "Craciunul" },
-  { date: "2025-12-26", name: "Craciunul" },
-  // 2026
-  { date: "2026-01-01", name: "Anul Nou" },
-  { date: "2026-01-02", name: "Anul Nou" },
-  { date: "2026-01-06", name: "Boboteaza" },
-  { date: "2026-01-07", name: "Sfantul Ioan Botezatorul" },
-  { date: "2026-01-24", name: "Unirea Principatelor Romane" },
-  { date: "2026-04-10", name: "Vinerea Mare" },
-  { date: "2026-04-12", name: "Paste ortodox" },
-  { date: "2026-04-13", name: "Paste ortodox" },
-  { date: "2026-05-01", name: "Ziua Muncii" },
-  { date: "2026-05-31", name: "Rusalii" },
-  { date: "2026-06-01", name: "Ziua Copilului / Rusalii" },
-  { date: "2026-08-15", name: "Adormirea Maicii Domnului" },
-  { date: "2026-11-30", name: "Sfantul Andrei" },
-  { date: "2026-12-01", name: "Ziua Nationala a Romaniei" },
-  { date: "2026-12-25", name: "Craciunul" },
-  { date: "2026-12-26", name: "Craciunul" },
-  // 2027
-  { date: "2027-01-01", name: "Anul Nou" },
-  { date: "2027-01-02", name: "Anul Nou" },
-  { date: "2027-01-06", name: "Boboteaza" },
-  { date: "2027-01-07", name: "Sfantul Ioan Botezatorul" },
-  { date: "2027-01-24", name: "Unirea Principatelor Romane" },
-  { date: "2027-04-30", name: "Vinerea Mare" },
-  { date: "2027-05-02", name: "Paste ortodox" },
-  { date: "2027-05-03", name: "Paste ortodox" },
-  { date: "2027-05-01", name: "Ziua Muncii" },
-  { date: "2027-06-01", name: "Ziua Copilului" },
-  { date: "2027-06-20", name: "Rusalii" },
-  { date: "2027-06-21", name: "Rusalii" },
-  { date: "2027-08-15", name: "Adormirea Maicii Domnului" },
-  { date: "2027-11-30", name: "Sfantul Andrei" },
-  { date: "2027-12-01", name: "Ziua Nationala a Romaniei" },
-  { date: "2027-12-25", name: "Craciunul" },
-  { date: "2027-12-26", name: "Craciunul" },
+const FIXED_HOLIDAYS = [
+  ["01-01", "Anul Nou"],
+  ["01-02", "Anul Nou"],
+  ["01-06", "Boboteaza"],
+  ["01-07", "Sfantul Ioan Botezatorul"],
+  ["01-24", "Unirea Principatelor Romane"],
+  ["05-01", "Ziua Muncii"],
+  ["06-01", "Ziua Copilului"],
+  ["08-15", "Adormirea Maicii Domnului"],
+  ["11-30", "Sfantul Andrei"],
+  ["12-01", "Ziua Nationala a Romaniei"],
+  ["12-25", "Craciunul"],
+  ["12-26", "Craciunul"],
 ];
+
+const formatDate = (date) => {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const addDays = (date, days) => {
+  const out = new Date(date);
+  out.setUTCDate(out.getUTCDate() + days);
+  return out;
+};
+
+const addHoliday = (map, date, name) => {
+  const key = formatDate(date);
+  const current = map.get(key);
+  if (!current) map.set(key, name);
+  else if (!current.includes(name)) map.set(key, `${current} / ${name}`);
+};
+
+const orthodoxEasterGregorian = (year) => {
+  const a = year % 4;
+  const b = year % 7;
+  const c = year % 19;
+  const d = (19 * c + 15) % 30;
+  const e = (2 * a + 4 * b - d + 34) % 7;
+  const month = Math.floor((d + e + 114) / 31);
+  const day = ((d + e + 114) % 31) + 1;
+  const julianDate = new Date(Date.UTC(year, month - 1, day));
+  return addDays(julianDate, 13);
+};
+
+const buildDefaultHolidays = (startYear = 2000, endYear = 2100) => {
+  const map = new Map();
+  for (let year = startYear; year <= endYear; year += 1) {
+    FIXED_HOLIDAYS.forEach(([md, name]) => {
+      const [month, day] = md.split("-");
+      addHoliday(map, new Date(Date.UTC(year, Number(month) - 1, Number(day))), name);
+    });
+
+    const easter = orthodoxEasterGregorian(year);
+    addHoliday(map, addDays(easter, -2), "Vinerea Mare");
+    addHoliday(map, easter, "Paste ortodox");
+    addHoliday(map, addDays(easter, 1), "Paste ortodox");
+    addHoliday(map, addDays(easter, 49), "Rusalii");
+    addHoliday(map, addDays(easter, 50), "Rusalii");
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, name]) => ({ date, name }));
+};
+
+export const DEFAULT_HOLIDAYS = buildDefaultHolidays();
 
 const HOLIDAY_KEY = "rca_holidays_v1";
 
