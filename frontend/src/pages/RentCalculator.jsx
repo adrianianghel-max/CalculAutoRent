@@ -213,7 +213,7 @@ export default function RentCalculator() {
   const ensureApiConfigured = () => {
     if (API) return true;
     if (!missingApiWarnedRef.current) {
-      toast.error("Lipseste REACT_APP_BACKEND_URL. Configureaza URL-ul backend-ului.");
+      toast.error("Lipseste URL-ul backend-ului pentru mediu non-local. Configureaza REACT_APP_BACKEND_URL.");
       missingApiWarnedRef.current = true;
     }
     return false;

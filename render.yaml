@@ -14,7 +14,7 @@ services:
     name: calculautorent-frontend
     env: static
     rootDir: frontend
-    buildCommand: yarn install --frozen-lockfile && yarn build
+    buildCommand: yarn install && yarn build
     staticPublishPath: build
     autoDeploy: true
     envVars:
