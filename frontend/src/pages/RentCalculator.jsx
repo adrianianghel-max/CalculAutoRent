@@ -61,7 +61,16 @@ import {
 } from "@/lib/pdfExtract";
 
 const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
-const API = `${backendBaseUrl || ""}/api`;
+const isLocalDevHost =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+const apiBaseUrl = backendBaseUrl || (isLocalDevHost ? "http://localhost:8000" : "");
+
+if (!apiBaseUrl) {
+  throw new Error("Missing REACT_APP_BACKEND_URL. Configure the frontend environment variable.");
+}
+
+const API = `${apiBaseUrl}/api`;
 
 const TYPE_STYLES = {
   avizare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",

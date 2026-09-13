@@ -8,7 +8,7 @@ Aplicatie web pentru calcul rent auto RCA:
 
 ### Backend
 ```bash
-cd /home/runner/work/CalculAutoRent/CalculAutoRent/backend
+cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -18,7 +18,7 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 
 ### Frontend
 ```bash
-cd /home/runner/work/CalculAutoRent/CalculAutoRent/frontend
+cd frontend
 cp .env.example .env
 yarn install
 yarn start
@@ -36,7 +36,7 @@ Repo-ul trebuie sa fie disponibil pe GitHub.
 
 ### 2) Creeaza serviciile pe Render
 1. Intra pe Render -> **New** -> **Blueprint**.
-2. Conecteaza repo-ul `adrianianghel-max/CalculAutoRent`.
+2. Conecteaza acest repository.
 3. Render citeste `render.yaml` si propune:
    - `calculautorent-backend` (FastAPI)
    - `calculautorent-frontend` (static site)
