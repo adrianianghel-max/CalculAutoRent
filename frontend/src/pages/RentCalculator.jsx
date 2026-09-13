@@ -42,6 +42,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { HolidayManager } from "@/components/HolidayManager";
 import {
   DEFAULT_FORM,
+  DEFAULT_HOLIDAYS,
   EMPTY_FORM,
   DEFAULT_EMAIL_TO,
   loadForm,
@@ -223,6 +224,7 @@ export default function RentCalculator() {
       setHolidays(local);
     } else {
       if (!ensureApiConfigured()) {
+        setHolidays(DEFAULT_HOLIDAYS);
         return;
       }
       axios

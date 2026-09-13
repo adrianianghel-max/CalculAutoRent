@@ -92,6 +92,62 @@ EMPTY_FORM.status_deplasare = "NEDEPLASABIL";
 EMPTY_FORM.observatii = DEFAULT_OBSERVATII;
 EMPTY_FORM.semnatura = DEFAULT_SEMNATURA;
 
+export const DEFAULT_HOLIDAYS = [
+  // 2025
+  { date: "2025-01-01", name: "Anul Nou" },
+  { date: "2025-01-02", name: "Anul Nou" },
+  { date: "2025-01-06", name: "Boboteaza" },
+  { date: "2025-01-07", name: "Sfantul Ioan Botezatorul" },
+  { date: "2025-01-24", name: "Unirea Principatelor Romane" },
+  { date: "2025-04-18", name: "Vinerea Mare" },
+  { date: "2025-04-20", name: "Paste ortodox" },
+  { date: "2025-04-21", name: "Paste ortodox" },
+  { date: "2025-05-01", name: "Ziua Muncii" },
+  { date: "2025-06-01", name: "Ziua Copilului" },
+  { date: "2025-06-08", name: "Rusalii" },
+  { date: "2025-06-09", name: "Rusalii" },
+  { date: "2025-08-15", name: "Adormirea Maicii Domnului" },
+  { date: "2025-11-30", name: "Sfantul Andrei" },
+  { date: "2025-12-01", name: "Ziua Nationala a Romaniei" },
+  { date: "2025-12-25", name: "Craciunul" },
+  { date: "2025-12-26", name: "Craciunul" },
+  // 2026
+  { date: "2026-01-01", name: "Anul Nou" },
+  { date: "2026-01-02", name: "Anul Nou" },
+  { date: "2026-01-06", name: "Boboteaza" },
+  { date: "2026-01-07", name: "Sfantul Ioan Botezatorul" },
+  { date: "2026-01-24", name: "Unirea Principatelor Romane" },
+  { date: "2026-04-10", name: "Vinerea Mare" },
+  { date: "2026-04-12", name: "Paste ortodox" },
+  { date: "2026-04-13", name: "Paste ortodox" },
+  { date: "2026-05-01", name: "Ziua Muncii" },
+  { date: "2026-05-31", name: "Rusalii" },
+  { date: "2026-06-01", name: "Ziua Copilului / Rusalii" },
+  { date: "2026-08-15", name: "Adormirea Maicii Domnului" },
+  { date: "2026-11-30", name: "Sfantul Andrei" },
+  { date: "2026-12-01", name: "Ziua Nationala a Romaniei" },
+  { date: "2026-12-25", name: "Craciunul" },
+  { date: "2026-12-26", name: "Craciunul" },
+  // 2027
+  { date: "2027-01-01", name: "Anul Nou" },
+  { date: "2027-01-02", name: "Anul Nou" },
+  { date: "2027-01-06", name: "Boboteaza" },
+  { date: "2027-01-07", name: "Sfantul Ioan Botezatorul" },
+  { date: "2027-01-24", name: "Unirea Principatelor Romane" },
+  { date: "2027-04-30", name: "Vinerea Mare" },
+  { date: "2027-05-02", name: "Paste ortodox" },
+  { date: "2027-05-03", name: "Paste ortodox" },
+  { date: "2027-05-01", name: "Ziua Muncii" },
+  { date: "2027-06-01", name: "Ziua Copilului" },
+  { date: "2027-06-20", name: "Rusalii" },
+  { date: "2027-06-21", name: "Rusalii" },
+  { date: "2027-08-15", name: "Adormirea Maicii Domnului" },
+  { date: "2027-11-30", name: "Sfantul Andrei" },
+  { date: "2027-12-01", name: "Ziua Nationala a Romaniei" },
+  { date: "2027-12-25", name: "Craciunul" },
+  { date: "2027-12-26", name: "Craciunul" },
+];
+
 const HOLIDAY_KEY = "rca_holidays_v1";
 
 export function loadHolidays(fallback = []) {
