@@ -192,10 +192,8 @@ function Kpi({ label, value, sub, accent, testid }) {
 
 export default function RentCalculator() {
   const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
-  const isLocalDevHost =
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-  const apiBaseUrl = backendBaseUrl || (isLocalDevHost ? "http://localhost:8000" : "");
+  const isDevelopmentBuild = process.env.NODE_ENV === "development";
+  const apiBaseUrl = backendBaseUrl || (isDevelopmentBuild ? "http://localhost:8000" : "");
   const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api` : null;
 
   const [form, setForm] = useState(loadForm);
