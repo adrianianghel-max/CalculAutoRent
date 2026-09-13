@@ -161,7 +161,8 @@ const buildDefaultHolidays = (startYear = 2000, endYear = 2100) => {
     .map(([date, name]) => ({ date, name }));
 };
 
-export const DEFAULT_HOLIDAYS = buildDefaultHolidays();
+const CURRENT_YEAR = new Date().getUTCFullYear();
+export const DEFAULT_HOLIDAYS = buildDefaultHolidays(CURRENT_YEAR - 5, CURRENT_YEAR + 15);
 
 const HOLIDAY_KEY = "rca_holidays_v1";
 
