@@ -46,10 +46,11 @@ Repo-ul trebuie sa fie disponibil pe GitHub.
   - `CORS_ORIGINS=https://calculautorent-frontend.onrender.com,http://localhost:3000`
   - După primul deploy, actualizează `CORS_ORIGINS` cu URL-ul real generat de Render (sau domeniul tău custom), apoi redeploy.
 - La **frontend** (`calculautorent-frontend`):
-  - `REACT_APP_BACKEND_URL=https://<backend-url-render>` (**obligatoriu la build time**)
+  - `REACT_APP_BACKEND_URL=https://<backend-url-render>` (**obligatoriu la build time pentru funcționalitate completă**)
 
 Nota: pentru frontend static (CRA), `REACT_APP_BACKEND_URL` este incorporat in bundle in timpul `yarn build`.  
 Daca schimbi valoarea variabilei, trebuie redeploy/rebuild ca sa intre in aplicatie.
+Fara aceasta variabila, frontend-ul porneste, dar functiile care depind de API ruleaza in mod limitat.
 
 ### 4) Activeaza auto-deploy
 Este deja setat in `render.yaml` (`autoDeploy: true`).  

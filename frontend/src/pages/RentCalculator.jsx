@@ -96,6 +96,35 @@ const dateToDdmmyyyy = (d) => {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
+const extractYearsFromForm = (form) =>
+  Object.values(form || {})
+    .filter((v) => typeof v === "string")
+    .map((value) => {
+      const iso = value.match(/^(\d{4})-\d{2}-\d{2}$/);
+      if (iso) return Number(iso[1]);
+      const ro = value.match(/^\d{2}\/\d{2}\/(\d{4})$/);
+      if (ro) return Number(ro[1]);
+      return null;
+    })
+    .filter((y) => Number.isInteger(y));
+
+const formatHostForUrl = (host) => (host.includes(":") && !host.startsWith("[") ? `[${host}]` : host);
+
+const resolveApiBaseUrl = () => {
+  const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
+  if (backendBaseUrl) return backendBaseUrl;
+
+  const browserHost = typeof window !== "undefined" ? window.location.hostname : "";
+  const isLocalHost =
+    browserHost === "localhost" ||
+    browserHost.endsWith(".localhost") ||
+    browserHost === "127.0.0.1" ||
+    browserHost === "0.0.0.0" ||
+    browserHost === "::1";
+  if (!isLocalHost) return "";
+  return `http://${formatHostForUrl(browserHost || "localhost")}:8000`;
+};
+
 // Camp de data: input text dd/mm/yyyy + buton calendar (popover) pentru selectie.
 function DateField({ id, value, onChange, testid }) {
   const [open, setOpen] = useState(false);
@@ -192,18 +221,7 @@ function Kpi({ label, value, sub, accent, testid }) {
 }
 
 export default function RentCalculator() {
-  const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
-  const browserHost = typeof window !== "undefined" ? window.location.hostname : "";
-  const formatHostForUrl = (host) => (host.includes(":") && !host.startsWith("[") ? `[${host}]` : host);
-  const fallbackHost = formatHostForUrl(browserHost || "localhost");
-  const isLocalHost =
-    browserHost === "localhost" ||
-    browserHost.endsWith(".localhost") ||
-    browserHost === "127.0.0.1" ||
-    browserHost === "0.0.0.0" ||
-    browserHost === "::1";
-  const derivedLocalBackendUrl = fallbackHost ? `http://${fallbackHost}:8000` : "http://localhost:8000";
-  const apiBaseUrl = backendBaseUrl || (isLocalHost ? derivedLocalBackendUrl : "");
+  const apiBaseUrl = resolveApiBaseUrl();
   const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api` : null;
 
   const [form, setForm] = useState(loadForm);
@@ -217,19 +235,7 @@ export default function RentCalculator() {
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
   const missingApiWarnedRef = useRef(false);
-  const fallbackHolidays = useMemo(() => {
-    const years = Object.values(form || {})
-      .filter((v) => typeof v === "string")
-      .map((value) => {
-        const iso = value.match(/^(\d{4})-\d{2}-\d{2}$/);
-        if (iso) return Number(iso[1]);
-        const ro = value.match(/^\d{2}\/\d{2}\/(\d{4})$/);
-        if (ro) return Number(ro[1]);
-        return null;
-      })
-      .filter((y) => Number.isInteger(y));
-    return getDefaultHolidays(years);
-  }, [form]);
+  const fallbackHolidaysRef = useRef(getDefaultHolidays(extractYearsFromForm(form)));
 
   const ensureApiConfigured = useCallback(() => {
     if (apiUrl) return true;
@@ -246,15 +252,15 @@ export default function RentCalculator() {
       setHolidays(local);
     } else {
       if (!ensureApiConfigured()) {
-        setHolidays(fallbackHolidays);
+        setHolidays(fallbackHolidaysRef.current);
         return;
       }
       axios
         .get(`${apiUrl}/holidays`)
         .then((r) => setHolidays(r.data))
-        .catch(() => setHolidays(fallbackHolidays));
+        .catch(() => setHolidays(fallbackHolidaysRef.current));
     }
-  }, [apiUrl, ensureApiConfigured, fallbackHolidays]);
+  }, [apiUrl, ensureApiConfigured]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);
