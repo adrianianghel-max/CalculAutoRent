@@ -20,6 +20,7 @@ import {
   Trash2,
   Upload,
   FileDown,
+  FileSpreadsheet,
   Search,
   User,
   Receipt,
@@ -49,6 +50,7 @@ import {
   saveHolidays,
 } from "@/lib/rentDefaults";
 import { calculeaza } from "@/lib/rcaCalc";
+import { exportExcel } from "@/lib/exportExcel";
 import {
   readPdfText,
   readHighlights,
@@ -199,6 +201,7 @@ export default function RentCalculator() {
   const [dark, setDark] = useState(false);
   const [cuiLoading, setCuiLoading] = useState("");
   const [parsing, setParsing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -388,6 +391,18 @@ export default function RentCalculator() {
     });
     doc.save(`Solicitare_${form.nr_dosar || "dosar"}.pdf`);
     toast.success("PDF descarcat.");
+  };
+
+  const exportXlsm = async () => {
+    setExporting(true);
+    try {
+      await exportExcel(form, holidays);
+      toast.success("Excel exportat (foaia „Fisa de completat”).");
+    } catch (e) {
+      toast.error(e.message || "Eroare la exportul Excel.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const copyLetter = async () => {
@@ -741,6 +756,9 @@ export default function RentCalculator() {
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={calcula} size="lg" className="gap-2 shadow-md transition-transform active:scale-[0.98]" data-testid="calculeaza-rent-button">
                 <Calculator className="h-4 w-4" /> Calculează
+              </Button>
+              <Button onClick={exportXlsm} size="lg" variant="outline" disabled={exporting} className="gap-2" data-testid="export-excel-button">
+                <FileSpreadsheet className="h-4 w-4" /> {exporting ? "Se exportă..." : "Export Excel (Fișă)"}
               </Button>
               <Button variant="ghost" onClick={resetForm} className="gap-2 text-muted-foreground" data-testid="reset-form-button">
                 <RotateCcw className="h-3.5 w-3.5" /> Resetează formularul

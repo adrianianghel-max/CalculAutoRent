@@ -56,6 +56,14 @@ oriunde, care sa reproduca acelasi calcul si sa arate ca o aplicatie profesionis
   - Fisiere OCR servite local din public/tesseract (toate variantele: plain/simd/lstm/simd-lstm) si public/tessdata.
 - Buton "Goleste formular" (start curat) pe langa "Reseteaza formularul" (exemplu implicit).
 - Export PDF al scrisorii (jsPDF).
+- Export Excel (.xlsm): butonul "Export Excel (Fișă)" completeaza sablonul real al userului
+  (public/fisa_template.xlsm) in foaia "Fisa de completat", editand DOAR celulele mapate in XML
+  (JSZip) — pastreaza macrourile VBA, stilurile si formulele; forteaza recalc la deschidere.
+  Text (cu zerouri initiale pastrate), numere si date reale Excel. 100% in browser (GDPR).
+  Mapare celule: F2 dosar, D5 marca, F5 status, D6 nr auto, D7 nume, D8 adresa pagubit,
+  D9/F9/D10 cesionar, D11/D12 date, C15/D15/E15/F15/C16 rep factura+cui, D19-F27 diferente,
+  C30/D30/E30/F30/C31 rent factura+cui, D33/E33/D34/E34 valori+zile, D35-F37 auto/rca/tva,
+  D38-D44 perioade (rec->D41, comanda->D42, antifrauda->D43), constatare D44. Validat cu openpyxl.
 - Testat: backend 20/20, frontend 5/5 fluxuri (iteration_3.json). Paritate calcul JS vs Excel confirmata (15 zile / 5445 / 39347.19).
 
 ## Implemented (2026-06-11)
