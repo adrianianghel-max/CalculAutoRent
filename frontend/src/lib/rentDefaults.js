@@ -120,6 +120,8 @@ const addDays = (date, days) => {
   return out;
 };
 
+const julianGregorianOffsetDays = (year) => Math.floor(year / 100) - Math.floor(year / 400) - 2;
+
 const addHoliday = (map, date, name) => {
   const key = formatDate(date);
   const current = map.get(key);
@@ -136,7 +138,7 @@ const orthodoxEasterGregorian = (year) => {
   const month = Math.floor((d + e + 114) / 31);
   const day = ((d + e + 114) % 31) + 1;
   const julianDate = new Date(Date.UTC(year, month - 1, day));
-  return addDays(julianDate, 13);
+  return addDays(julianDate, julianGregorianOffsetDays(year));
 };
 
 const buildDefaultHolidays = (startYear = 2000, endYear = 2100) => {
