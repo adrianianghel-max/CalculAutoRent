@@ -263,7 +263,7 @@ export default function RentCalculator() {
     };
 
     const local = loadHolidays(null);
-    if (local) {
+    if (Array.isArray(local) && local.length > 0) {
       usingGeneratedHolidaysRef.current = false;
       setHolidays(local);
     } else {
