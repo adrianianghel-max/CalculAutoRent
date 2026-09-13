@@ -14,7 +14,7 @@ services:
     name: calculautorent-frontend
     env: static
     rootDir: frontend
-    buildCommand: corepack enable && corepack prepare yarn@1.22.22 --activate && yarn install && yarn build
+    buildCommand: corepack enable && corepack prepare yarn@1.22.22 --activate && yarn install --frozen-lockfile && yarn build
     staticPublishPath: build
     autoDeploy: true
     envVars:

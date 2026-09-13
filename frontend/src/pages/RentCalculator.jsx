@@ -223,7 +223,7 @@ function Kpi({ label, value, sub, accent, testid }) {
 }
 
 export default function RentCalculator() {
-  const apiBaseUrl = resolveApiBaseUrl();
+  const apiBaseUrl = useMemo(() => resolveApiBaseUrl(), []);
   const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api` : null;
 
   const [form, setForm] = useState(loadForm);
