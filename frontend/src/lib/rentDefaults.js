@@ -161,8 +161,16 @@ const buildDefaultHolidays = (startYear = 2000, endYear = 2100) => {
     .map(([date, name]) => ({ date, name }));
 };
 
-const CURRENT_YEAR = new Date().getUTCFullYear();
-export const DEFAULT_HOLIDAYS = buildDefaultHolidays(CURRENT_YEAR - 5, CURRENT_YEAR + 15);
+export const getDefaultHolidays = (years = []) => {
+  const numericYears = years
+    .map((y) => Number(y))
+    .filter((y) => Number.isInteger(y) && y >= 1900 && y <= 2400);
+  const currentYear = new Date().getUTCFullYear();
+  const uniqueYears = Array.from(new Set([currentYear, ...numericYears]));
+  const minYear = Math.min(...uniqueYears) - 1;
+  const maxYear = Math.max(...uniqueYears) + 1;
+  return buildDefaultHolidays(minYear, maxYear);
+};
 
 const HOLIDAY_KEY = "rca_holidays_v1";
 

@@ -42,9 +42,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { HolidayManager } from "@/components/HolidayManager";
 import {
   DEFAULT_FORM,
-  DEFAULT_HOLIDAYS,
   EMPTY_FORM,
   DEFAULT_EMAIL_TO,
+  getDefaultHolidays,
   loadForm,
   saveForm,
   loadHolidays,
@@ -194,7 +194,8 @@ function Kpi({ label, value, sub, accent, testid }) {
 export default function RentCalculator() {
   const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
   const browserHost = typeof window !== "undefined" ? window.location.hostname : "";
-  const fallbackHost = browserHost === "::1" ? "[::1]" : browserHost;
+  const formatHostForUrl = (host) => (host.includes(":") && !host.startsWith("[") ? `[${host}]` : host);
+  const fallbackHost = formatHostForUrl(browserHost || "localhost");
   const isLocalHost =
     browserHost === "localhost" ||
     browserHost.endsWith(".localhost") ||
@@ -216,6 +217,19 @@ export default function RentCalculator() {
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
   const missingApiWarnedRef = useRef(false);
+  const fallbackHolidays = useMemo(() => {
+    const years = Object.values(form || {})
+      .filter((v) => typeof v === "string")
+      .map((value) => {
+        const iso = value.match(/^(\d{4})-\d{2}-\d{2}$/);
+        if (iso) return Number(iso[1]);
+        const ro = value.match(/^\d{2}\/\d{2}\/(\d{4})$/);
+        if (ro) return Number(ro[1]);
+        return null;
+      })
+      .filter((y) => Number.isInteger(y));
+    return getDefaultHolidays(years);
+  }, [form]);
 
   const ensureApiConfigured = useCallback(() => {
     if (apiUrl) return true;
@@ -232,15 +246,15 @@ export default function RentCalculator() {
       setHolidays(local);
     } else {
       if (!ensureApiConfigured()) {
-        setHolidays(DEFAULT_HOLIDAYS);
+        setHolidays(fallbackHolidays);
         return;
       }
       axios
         .get(`${apiUrl}/holidays`)
         .then((r) => setHolidays(r.data))
-        .catch(() => setHolidays(DEFAULT_HOLIDAYS));
+        .catch(() => setHolidays(fallbackHolidays));
     }
-  }, [apiUrl, ensureApiConfigured]);
+  }, [apiUrl, ensureApiConfigured, fallbackHolidays]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);
