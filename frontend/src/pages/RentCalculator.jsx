@@ -232,7 +232,7 @@ export default function RentCalculator() {
         .then((r) => setHolidays(r.data))
         .catch(() => setHolidays([]));
     }
-  }, []);
+  }, [apiUrl]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);
