@@ -241,6 +241,8 @@ export default function RentCalculator() {
   const missingApiWarnedRef = useRef(false);
   const usingGeneratedHolidaysRef = useRef(false);
   const lastGeneratedHolidaysRef = useRef("[]");
+  const lastGeneratedYearsKeyRef = useRef("");
+  const generatedHolidaysCacheRef = useRef(new Map());
   const formRef = useRef(form);
 
   useEffect(() => {
@@ -256,8 +258,18 @@ export default function RentCalculator() {
     return false;
   }, [apiUrl]);
 
+  const getCachedFallbackHolidays = useCallback((sourceForm) => {
+    const years = extractYearsFromForm(sourceForm);
+    const key = Array.from(new Set(years)).sort((a, b) => a - b).join(",");
+    const cached = generatedHolidaysCacheRef.current.get(key);
+    if (cached) return { key, list: cached };
+    const list = getDefaultHolidays(years);
+    generatedHolidaysCacheRef.current.set(key, list);
+    return { key, list };
+  }, []);
+
   useEffect(() => {
-    const resolveFallbackHolidays = () => getDefaultHolidays(extractYearsFromForm(formRef.current));
+    const resolveFallbackHolidays = () => getCachedFallbackHolidays(formRef.current);
     const setGeneratedHolidays = (list) => {
       const serialized = serializeHolidayList(list);
       lastGeneratedHolidaysRef.current = serialized;
@@ -270,22 +282,33 @@ export default function RentCalculator() {
       setHolidays(local);
     } else {
       if (!ensureApiConfigured()) {
+        const { key, list } = resolveFallbackHolidays();
+        lastGeneratedYearsKeyRef.current = key;
         usingGeneratedHolidaysRef.current = true;
-        setGeneratedHolidays(resolveFallbackHolidays());
+        setGeneratedHolidays(list);
         return;
       }
       axios
         .get(`${apiUrl}/holidays`)
         .then((r) => {
+          if (!Array.isArray(r.data) || !r.data.length) {
+            const { key, list } = resolveFallbackHolidays();
+            lastGeneratedYearsKeyRef.current = key;
+            usingGeneratedHolidaysRef.current = true;
+            setGeneratedHolidays(list);
+            return;
+          }
           usingGeneratedHolidaysRef.current = false;
           setHolidays(r.data);
         })
         .catch(() => {
+          const { key, list } = resolveFallbackHolidays();
+          lastGeneratedYearsKeyRef.current = key;
           usingGeneratedHolidaysRef.current = true;
-          setGeneratedHolidays(resolveFallbackHolidays());
+          setGeneratedHolidays(list);
         });
     }
-  }, [apiUrl, ensureApiConfigured]);
+  }, [apiUrl, ensureApiConfigured, getCachedFallbackHolidays]);
 
   useEffect(() => {
     if (!usingGeneratedHolidaysRef.current) return;
@@ -294,12 +317,14 @@ export default function RentCalculator() {
       usingGeneratedHolidaysRef.current = false;
       return;
     }
-    const regenerated = getDefaultHolidays(extractYearsFromForm(form));
+    const { key, list: regenerated } = getCachedFallbackHolidays(form);
+    if (key === lastGeneratedYearsKeyRef.current) return;
     const regeneratedSerialized = serializeHolidayList(regenerated);
     if (regeneratedSerialized === currentSerialized) return;
+    lastGeneratedYearsKeyRef.current = key;
     lastGeneratedHolidaysRef.current = regeneratedSerialized;
     setHolidays(regenerated);
-  }, [form, holidays]);
+  }, [form, holidays, getCachedFallbackHolidays]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);

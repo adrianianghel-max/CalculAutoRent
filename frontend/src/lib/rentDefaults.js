@@ -165,6 +165,9 @@ export const getDefaultHolidays = (years = []) => {
     .map((y) => Number(y))
     .filter((y) => Number.isInteger(y) && y >= 1900 && y <= 2400);
   const currentYear = new Date().getUTCFullYear();
+  if (!numericYears.length) {
+    return buildDefaultHolidays(currentYear, currentYear);
+  }
   const uniqueYears = Array.from(new Set([currentYear, ...numericYears]));
   const minYear = Math.min(...uniqueYears) - 1;
   const maxYear = Math.max(...uniqueYears) + 1;
