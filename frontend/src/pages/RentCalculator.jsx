@@ -60,7 +60,8 @@ import {
   terminateOcr,
 } from "@/lib/pdfExtract";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
+const API = `${backendBaseUrl || ""}/api`;
 
 const TYPE_STYLES = {
   avizare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
