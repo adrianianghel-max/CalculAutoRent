@@ -125,6 +125,8 @@ const resolveApiBaseUrl = () => {
   return `http://${formatHostForUrl(browserHost || "localhost")}:8000`;
 };
 
+const serializeHolidayList = (list) => JSON.stringify(list || []);
+
 // Camp de data: input text dd/mm/yyyy + buton calendar (popover) pentru selectie.
 function DateField({ id, value, onChange, testid }) {
   const [open, setOpen] = useState(false);
@@ -236,6 +238,7 @@ export default function RentCalculator() {
   const fileRef = useRef(null);
   const missingApiWarnedRef = useRef(false);
   const usingGeneratedHolidaysRef = useRef(false);
+  const lastGeneratedHolidaysRef = useRef("[]");
   const formRef = useRef(form);
 
   useEffect(() => {
@@ -253,6 +256,12 @@ export default function RentCalculator() {
 
   useEffect(() => {
     const resolveFallbackHolidays = () => getDefaultHolidays(extractYearsFromForm(formRef.current));
+    const setGeneratedHolidays = (list) => {
+      const serialized = serializeHolidayList(list);
+      lastGeneratedHolidaysRef.current = serialized;
+      setHolidays(list);
+    };
+
     const local = loadHolidays(null);
     if (local) {
       usingGeneratedHolidaysRef.current = false;
@@ -260,7 +269,7 @@ export default function RentCalculator() {
     } else {
       if (!ensureApiConfigured()) {
         usingGeneratedHolidaysRef.current = true;
-        setHolidays(resolveFallbackHolidays());
+        setGeneratedHolidays(resolveFallbackHolidays());
         return;
       }
       axios
@@ -271,15 +280,24 @@ export default function RentCalculator() {
         })
         .catch(() => {
           usingGeneratedHolidaysRef.current = true;
-          setHolidays(resolveFallbackHolidays());
+          setGeneratedHolidays(resolveFallbackHolidays());
         });
     }
   }, [apiUrl, ensureApiConfigured]);
 
   useEffect(() => {
     if (!usingGeneratedHolidaysRef.current) return;
-    setHolidays(getDefaultHolidays(extractYearsFromForm(form)));
-  }, [form]);
+    const currentSerialized = serializeHolidayList(holidays);
+    if (currentSerialized !== lastGeneratedHolidaysRef.current) {
+      usingGeneratedHolidaysRef.current = false;
+      return;
+    }
+    const regenerated = getDefaultHolidays(extractYearsFromForm(form));
+    const regeneratedSerialized = serializeHolidayList(regenerated);
+    if (regeneratedSerialized === currentSerialized) return;
+    lastGeneratedHolidaysRef.current = regeneratedSerialized;
+    setHolidays(regenerated);
+  }, [form, holidays]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);
