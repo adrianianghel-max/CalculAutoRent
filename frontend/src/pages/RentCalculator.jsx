@@ -195,17 +195,12 @@ export default function RentCalculator() {
   const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
   const browserHost = typeof window !== "undefined" ? window.location.hostname : "";
   const fallbackHost = browserHost === "::1" ? "[::1]" : browserHost;
-  const isPrivateIpv4 =
-    /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})$/.test(
-      browserHost,
-    );
   const isLocalHost =
     browserHost === "localhost" ||
     browserHost.endsWith(".localhost") ||
     browserHost === "127.0.0.1" ||
     browserHost === "0.0.0.0" ||
-    browserHost === "::1" ||
-    isPrivateIpv4;
+    browserHost === "::1";
   const derivedLocalBackendUrl = fallbackHost ? `http://${fallbackHost}:8000` : "http://localhost:8000";
   const apiBaseUrl = backendBaseUrl || (isLocalHost ? derivedLocalBackendUrl : "");
   const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api` : null;

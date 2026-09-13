@@ -44,6 +44,7 @@ Repo-ul trebuie sa fie disponibil pe GitHub.
 ### 3) Configureaza variabilele de mediu
 - La **backend** (`calculautorent-backend`):
   - `CORS_ORIGINS=https://calculautorent-frontend.onrender.com,http://localhost:3000`
+  - După primul deploy, actualizează `CORS_ORIGINS` cu URL-ul real generat de Render (sau domeniul tău custom), apoi redeploy.
 - La **frontend** (`calculautorent-frontend`):
   - `REACT_APP_BACKEND_URL=https://<backend-url-render>` (**obligatoriu la build time**)
 
