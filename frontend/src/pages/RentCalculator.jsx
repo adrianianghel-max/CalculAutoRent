@@ -65,12 +65,7 @@ const isLocalDevHost =
   typeof window !== "undefined" &&
   (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 const apiBaseUrl = backendBaseUrl || (isLocalDevHost ? "http://localhost:8000" : "");
-
-if (!apiBaseUrl) {
-  throw new Error("Missing REACT_APP_BACKEND_URL. Configure the frontend environment variable.");
-}
-
-const API = `${apiBaseUrl}/api`;
+const API = apiBaseUrl ? `${apiBaseUrl}/api` : null;
 
 const TYPE_STYLES = {
   avizare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
@@ -213,12 +208,26 @@ export default function RentCalculator() {
   const [parsing, setParsing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
+  const missingApiWarnedRef = useRef(false);
+
+  const ensureApiConfigured = () => {
+    if (API) return true;
+    if (!missingApiWarnedRef.current) {
+      toast.error("Lipseste REACT_APP_BACKEND_URL. Configureaza URL-ul backend-ului.");
+      missingApiWarnedRef.current = true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     const local = loadHolidays(null);
     if (local) {
       setHolidays(local);
     } else {
+      if (!ensureApiConfigured()) {
+        setHolidays([]);
+        return;
+      }
       axios
         .get(`${API}/holidays`)
         .then((r) => setHolidays(r.data))
@@ -359,6 +368,7 @@ export default function RentCalculator() {
   const lookupCui = async (cuiValue, target) => {
     const cui = String(cuiValue || "").trim();
     if (!cui) return toast.error("Introduceti un CUI.");
+    if (!ensureApiConfigured()) return;
     setCuiLoading(target);
     try {
       const r = await axios.post(`${API}/cui-lookup`, { cui });

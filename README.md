@@ -43,7 +43,7 @@ Repo-ul trebuie sa fie disponibil pe GitHub.
 
 ### 3) Configureaza variabilele de mediu
 - La **backend** (`calculautorent-backend`):
-  - `CORS_ORIGINS=https://<frontend-url-render>`
+  - `CORS_ORIGINS=https://<frontend-url-render>,http://localhost:3000`
 - La **frontend** (`calculautorent-frontend`):
   - `REACT_APP_BACKEND_URL=https://<backend-url-render>`
 
