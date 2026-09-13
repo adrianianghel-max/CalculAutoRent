@@ -115,12 +115,14 @@ const resolveApiBaseUrl = () => {
   if (backendBaseUrl) return backendBaseUrl;
 
   const browserHost = typeof window !== "undefined" ? window.location.hostname : "";
+  const isLoopbackIpv4 = /^127(?:\.\d{1,3}){3}$/.test(browserHost);
   const isLocalHost =
     browserHost === "localhost" ||
     browserHost.endsWith(".localhost") ||
-    browserHost === "127.0.0.1" ||
+    isLoopbackIpv4 ||
     browserHost === "0.0.0.0" ||
-    browserHost === "::1";
+    browserHost === "::1" ||
+    browserHost === "0:0:0:0:0:0:0:1";
   if (!isLocalHost) return "";
   return `http://${formatHostForUrl(browserHost || "localhost")}:8000`;
 };
