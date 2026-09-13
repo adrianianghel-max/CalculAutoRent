@@ -150,7 +150,6 @@ const buildDefaultHolidays = (startYear = 2000, endYear = 2100) => {
     });
 
     const easter = orthodoxEasterGregorian(year);
-    addHoliday(map, addDays(easter, -2), "Vinerea Mare");
     addHoliday(map, easter, "Paste ortodox");
     addHoliday(map, addDays(easter, 1), "Paste ortodox");
     addHoliday(map, addDays(easter, 49), "Rusalii");

@@ -248,7 +248,7 @@ export default function RentCalculator() {
   const ensureApiConfigured = useCallback(() => {
     if (apiUrl) return true;
     if (!missingApiWarnedRef.current) {
-      toast.error("API-ul este dezactivat: configurează REACT_APP_BACKEND_URL.");
+      toast.error("API indisponibil: nu a putut fi determinat URL-ul backend.");
       missingApiWarnedRef.current = true;
     }
     return false;
