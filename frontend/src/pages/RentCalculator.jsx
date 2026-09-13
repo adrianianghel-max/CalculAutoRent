@@ -225,6 +225,7 @@ export default function RentCalculator() {
       setHolidays(local);
     } else {
       if (!ensureApiConfigured()) {
+        setHolidays((prev) => (prev.length ? prev : loadHolidays([])));
         return;
       }
       axios
