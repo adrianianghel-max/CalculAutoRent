@@ -553,6 +553,14 @@ export default function RentCalculator() {
       </header>
 
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+        {!apiUrl && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="text-sm">
+              API indisponibil: setează <code>REACT_APP_BACKEND_URL</code> și redeploy la frontend.
+            </p>
+          </div>
+        )}
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* LEFT: form */}
           <div className="w-full space-y-5 lg:w-[60%]">
