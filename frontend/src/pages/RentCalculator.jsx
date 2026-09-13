@@ -60,13 +60,6 @@ import {
   terminateOcr,
 } from "@/lib/pdfExtract";
 
-const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
-const isLocalDevHost =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-const apiBaseUrl = backendBaseUrl || (isLocalDevHost ? "http://localhost:8000" : "");
-const API = apiBaseUrl ? `${apiBaseUrl}/api` : null;
-
 const TYPE_STYLES = {
   avizare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
   reparatie: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
@@ -198,6 +191,13 @@ function Kpi({ label, value, sub, accent, testid }) {
 }
 
 export default function RentCalculator() {
+  const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
+  const isLocalDevHost =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const apiBaseUrl = backendBaseUrl || (isLocalDevHost ? "http://localhost:8000" : "");
+  const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api` : null;
+
   const [form, setForm] = useState(loadForm);
   const [holidays, setHolidays] = useState([]);
   const [result, setResult] = useState(null);
@@ -211,7 +211,7 @@ export default function RentCalculator() {
   const missingApiWarnedRef = useRef(false);
 
   const ensureApiConfigured = () => {
-    if (API) return true;
+    if (apiUrl) return true;
     if (!missingApiWarnedRef.current) {
       toast.error("Lipseste URL-ul backend-ului pentru mediu non-local. Configureaza REACT_APP_BACKEND_URL.");
       missingApiWarnedRef.current = true;
@@ -228,7 +228,7 @@ export default function RentCalculator() {
         return;
       }
       axios
-        .get(`${API}/holidays`)
+        .get(`${apiUrl}/holidays`)
         .then((r) => setHolidays(r.data))
         .catch(() => setHolidays([]));
     }
@@ -370,7 +370,7 @@ export default function RentCalculator() {
     if (!ensureApiConfigured()) return;
     setCuiLoading(target);
     try {
-      const r = await axios.post(`${API}/cui-lookup`, { cui });
+      const r = await axios.post(`${apiUrl}/cui-lookup`, { cui });
       const { denumire, adresa, judet, localitate } = r.data;
       if (target === "cesionar") {
         patch({ nume_cesionar: denumire, adresa_cesionar: adresa || `${localitate}, ${judet}` });
