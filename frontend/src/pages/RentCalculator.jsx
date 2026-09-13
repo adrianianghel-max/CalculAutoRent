@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -44,6 +44,7 @@ import {
   DEFAULT_FORM,
   EMPTY_FORM,
   DEFAULT_EMAIL_TO,
+  getDefaultHolidays,
   loadForm,
   saveForm,
   loadHolidays,
@@ -59,8 +60,6 @@ import {
   classifyHighlights,
   terminateOcr,
 } from "@/lib/pdfExtract";
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const TYPE_STYLES = {
   avizare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
@@ -96,6 +95,39 @@ const dateToDdmmyyyy = (d) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
+
+const extractYearsFromForm = (form) =>
+  Object.values(form || {})
+    .filter((v) => typeof v === "string")
+    .map((value) => {
+      const iso = value.match(/^(\d{4})-\d{2}-\d{2}$/);
+      if (iso) return Number(iso[1]);
+      const ro = value.match(/^\d{2}\/\d{2}\/(\d{4})$/);
+      if (ro) return Number(ro[1]);
+      return null;
+    })
+    .filter((y) => Number.isInteger(y));
+
+const formatHostForUrl = (host) => (host.includes(":") && !host.startsWith("[") ? `[${host}]` : host);
+
+const resolveApiBaseUrl = () => {
+  const backendBaseUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
+  if (backendBaseUrl) return backendBaseUrl;
+
+  const browserHost = typeof window !== "undefined" ? window.location.hostname : "";
+  const isLoopbackIpv4 = /^127(?:\.\d{1,3}){3}$/.test(browserHost);
+  const isLocalHost =
+    browserHost === "localhost" ||
+    browserHost.endsWith(".localhost") ||
+    isLoopbackIpv4 ||
+    browserHost === "0.0.0.0" ||
+    browserHost === "::1" ||
+    browserHost === "0:0:0:0:0:0:0:1";
+  if (!isLocalHost) return "";
+  return `http://${formatHostForUrl(browserHost || "localhost")}:8000`;
+};
+
+const serializeHolidayList = (list) => JSON.stringify(list || []);
 
 // Camp de data: input text dd/mm/yyyy + buton calendar (popover) pentru selectie.
 function DateField({ id, value, onChange, testid }) {
@@ -193,6 +225,9 @@ function Kpi({ label, value, sub, accent, testid }) {
 }
 
 export default function RentCalculator() {
+  const apiBaseUrl = useMemo(() => resolveApiBaseUrl(), []);
+  const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api` : null;
+
   const [form, setForm] = useState(loadForm);
   const [holidays, setHolidays] = useState([]);
   const [result, setResult] = useState(null);
@@ -203,18 +238,93 @@ export default function RentCalculator() {
   const [parsing, setParsing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
+  const missingApiWarnedRef = useRef(false);
+  const usingGeneratedHolidaysRef = useRef(false);
+  const lastGeneratedHolidaysRef = useRef("[]");
+  const lastGeneratedYearsKeyRef = useRef("");
+  const generatedHolidaysCacheRef = useRef(new Map());
+  const formRef = useRef(form);
 
   useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
+  const ensureApiConfigured = useCallback(() => {
+    if (apiUrl) return true;
+    if (!missingApiWarnedRef.current) {
+      toast.error("API indisponibil: nu a putut fi determinat URL-ul backend.");
+      missingApiWarnedRef.current = true;
+    }
+    return false;
+  }, [apiUrl]);
+
+  const getCachedFallbackHolidays = useCallback((sourceForm) => {
+    const years = extractYearsFromForm(sourceForm);
+    const key = Array.from(new Set(years)).sort((a, b) => a - b).join(",");
+    const cached = generatedHolidaysCacheRef.current.get(key);
+    if (cached) return { key, list: cached };
+    const list = getDefaultHolidays(years);
+    generatedHolidaysCacheRef.current.set(key, list);
+    return { key, list };
+  }, []);
+
+  useEffect(() => {
+    const resolveFallbackHolidays = () => getCachedFallbackHolidays(formRef.current);
+    const setGeneratedHolidays = (list) => {
+      const serialized = serializeHolidayList(list);
+      lastGeneratedHolidaysRef.current = serialized;
+      setHolidays(list);
+    };
+
     const local = loadHolidays(null);
-    if (local) {
+    if (Array.isArray(local) && local.length > 0) {
+      usingGeneratedHolidaysRef.current = false;
       setHolidays(local);
     } else {
+      if (!ensureApiConfigured()) {
+        const { key, list } = resolveFallbackHolidays();
+        lastGeneratedYearsKeyRef.current = key;
+        usingGeneratedHolidaysRef.current = true;
+        setGeneratedHolidays(list);
+        return;
+      }
       axios
-        .get(`${API}/holidays`)
-        .then((r) => setHolidays(r.data))
-        .catch(() => setHolidays([]));
+        .get(`${apiUrl}/holidays`)
+        .then((r) => {
+          if (!Array.isArray(r.data) || !r.data.length) {
+            const { key, list } = resolveFallbackHolidays();
+            lastGeneratedYearsKeyRef.current = key;
+            usingGeneratedHolidaysRef.current = true;
+            setGeneratedHolidays(list);
+            return;
+          }
+          usingGeneratedHolidaysRef.current = false;
+          setHolidays(r.data);
+        })
+        .catch(() => {
+          const { key, list } = resolveFallbackHolidays();
+          lastGeneratedYearsKeyRef.current = key;
+          usingGeneratedHolidaysRef.current = true;
+          setGeneratedHolidays(list);
+        });
     }
-  }, []);
+  }, [apiUrl, ensureApiConfigured, getCachedFallbackHolidays]);
+
+  useEffect(() => {
+    if (!usingGeneratedHolidaysRef.current) return;
+    const currentSerialized = serializeHolidayList(holidays);
+    if (currentSerialized !== lastGeneratedHolidaysRef.current) {
+      usingGeneratedHolidaysRef.current = false;
+      return;
+    }
+    const { key, list: regenerated } = getCachedFallbackHolidays(form);
+    if (key === lastGeneratedYearsKeyRef.current) return;
+    const regeneratedSerialized = serializeHolidayList(regenerated);
+    if (regeneratedSerialized === currentSerialized) return;
+    lastGeneratedYearsKeyRef.current = key;
+    lastGeneratedHolidaysRef.current = regeneratedSerialized;
+    setHolidays(regenerated);
+  }, [form, holidays, getCachedFallbackHolidays]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);
@@ -349,9 +459,10 @@ export default function RentCalculator() {
   const lookupCui = async (cuiValue, target) => {
     const cui = String(cuiValue || "").trim();
     if (!cui) return toast.error("Introduceti un CUI.");
+    if (!ensureApiConfigured()) return;
     setCuiLoading(target);
     try {
-      const r = await axios.post(`${API}/cui-lookup`, { cui });
+      const r = await axios.post(`${apiUrl}/cui-lookup`, { cui });
       const { denumire, adresa, judet, localitate } = r.data;
       if (target === "cesionar") {
         patch({ nume_cesionar: denumire, adresa_cesionar: adresa || `${localitate}, ${judet}` });
@@ -536,6 +647,17 @@ export default function RentCalculator() {
       </header>
 
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+        {!apiUrl && (
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="text-sm">
+              API indisponibil: setează <code>REACT_APP_BACKEND_URL</code> și redeploy la frontend.
+            </p>
+          </div>
+        )}
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* LEFT: form */}
           <div className="w-full space-y-5 lg:w-[60%]">
