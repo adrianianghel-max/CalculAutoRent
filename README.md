@@ -1,6 +1,6 @@
 # CalculAutoRent
 
-Aplicatie web pentru calcul rent auto RCA:
+Aplicație web pentru calcul rent auto RCA:
 - frontend React (`/frontend`)
 - backend FastAPI (`/backend`)
 
