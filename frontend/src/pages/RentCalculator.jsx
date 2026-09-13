@@ -235,7 +235,12 @@ export default function RentCalculator() {
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
   const missingApiWarnedRef = useRef(false);
-  const fallbackHolidaysRef = useRef(getDefaultHolidays(extractYearsFromForm(form)));
+  const usingGeneratedHolidaysRef = useRef(false);
+  const formRef = useRef(form);
+
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
 
   const ensureApiConfigured = useCallback(() => {
     if (apiUrl) return true;
@@ -247,20 +252,34 @@ export default function RentCalculator() {
   }, [apiUrl]);
 
   useEffect(() => {
+    const resolveFallbackHolidays = () => getDefaultHolidays(extractYearsFromForm(formRef.current));
     const local = loadHolidays(null);
     if (local) {
+      usingGeneratedHolidaysRef.current = false;
       setHolidays(local);
     } else {
       if (!ensureApiConfigured()) {
-        setHolidays(fallbackHolidaysRef.current);
+        usingGeneratedHolidaysRef.current = true;
+        setHolidays(resolveFallbackHolidays());
         return;
       }
       axios
         .get(`${apiUrl}/holidays`)
-        .then((r) => setHolidays(r.data))
-        .catch(() => setHolidays(fallbackHolidaysRef.current));
+        .then((r) => {
+          usingGeneratedHolidaysRef.current = false;
+          setHolidays(r.data);
+        })
+        .catch(() => {
+          usingGeneratedHolidaysRef.current = true;
+          setHolidays(resolveFallbackHolidays());
+        });
     }
   }, [apiUrl, ensureApiConfigured]);
+
+  useEffect(() => {
+    if (!usingGeneratedHolidaysRef.current) return;
+    setHolidays(getDefaultHolidays(extractYearsFromForm(form)));
+  }, [form]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);
