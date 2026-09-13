@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -210,14 +210,14 @@ export default function RentCalculator() {
   const fileRef = useRef(null);
   const missingApiWarnedRef = useRef(false);
 
-  const ensureApiConfigured = () => {
+  const ensureApiConfigured = useCallback(() => {
     if (apiUrl) return true;
     if (!missingApiWarnedRef.current) {
       toast.error("Lipseste URL-ul backend-ului pentru mediu non-local. Configureaza REACT_APP_BACKEND_URL.");
       missingApiWarnedRef.current = true;
     }
     return false;
-  };
+  }, [apiUrl]);
 
   useEffect(() => {
     const local = loadHolidays(null);
@@ -232,7 +232,7 @@ export default function RentCalculator() {
         .then((r) => setHolidays(r.data))
         .catch(() => setHolidays([]));
     }
-  }, [apiUrl]);
+  }, [apiUrl, ensureApiConfigured]);
 
   useEffect(() => {
     if (holidays.length) saveHolidays(holidays);
