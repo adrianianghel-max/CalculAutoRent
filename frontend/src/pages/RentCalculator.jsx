@@ -192,6 +192,48 @@ function Kpi({ label, value, sub, accent, testid }) {
   );
 }
 
+const toNum = (x) => {
+  const v = parseFloat(String(x ?? "").replace(",", "."));
+  return isNaN(v) ? 0 : v;
+};
+const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+
+function DiffRow({ label, unit, factValue, accValue, onFact, onAcc, readOnly, factTestid, accTestid }) {
+  const cls = `col-span-6 h-9 sm:col-span-4 ${readOnly ? "bg-muted/60 font-semibold" : "border-primary/40"}`;
+  return (
+    <div className="grid grid-cols-12 items-center gap-2 border-b py-2 last:border-0">
+      <span className="col-span-12 text-xs font-medium sm:col-span-4">
+        {label}
+        {unit && <span className="text-muted-foreground"> ({unit})</span>}
+      </span>
+      <Input className={cls} inputMode="decimal" value={factValue ?? ""} readOnly={readOnly} onChange={onFact ? (e) => onFact(e.target.value) : undefined} data-testid={factTestid} />
+      <Input className={cls} inputMode="decimal" value={accValue ?? ""} readOnly={readOnly} onChange={onAcc ? (e) => onAcc(e.target.value) : undefined} data-testid={accTestid} />
+    </div>
+  );
+}
+
+function CuiField({ label, cuiKey, nameKey, addrKey, target, form, patch, lookupCui, cuiLoading }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="flex items-end gap-2">
+        <Field label={label} id={cuiKey} className="flex-1">
+          <Input id={cuiKey} value={form[cuiKey] ?? ""} onChange={(e) => patch({ [cuiKey]: e.target.value.toUpperCase() })} data-testid={`${cuiKey.replace(/_/g, "-")}-input`} />
+        </Field>
+        <Button type="button" variant="outline" className="h-9 gap-1.5" onClick={() => lookupCui(form[cuiKey], target)} disabled={cuiLoading === target} data-testid={`lookup-${target}-cui-button`}>
+          <Search className="h-3.5 w-3.5" />
+          {cuiLoading === target ? "..." : "ANAF"}
+        </Button>
+      </div>
+      <div className="mt-2 grid grid-cols-1 gap-2">
+        <Input value={form[nameKey] ?? ""} onChange={(e) => patch({ [nameKey]: e.target.value.toUpperCase() })} placeholder="Nume firma" data-testid={`${nameKey.replace(/_/g, "-")}-input`} />
+        {addrKey && (
+          <Input value={form[addrKey] ?? ""} onChange={(e) => patch({ [addrKey]: e.target.value.toUpperCase() })} placeholder="Adresa / localitate" data-testid={`${addrKey.replace(/_/g, "-")}-input`} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function RentCalculator() {
   const [form, setForm] = useState(loadForm);
   const [holidays, setHolidays] = useState([]);
@@ -447,64 +489,36 @@ export default function RentCalculator() {
     return solicitat - result.suma_rent;
   }, [result, form]);
 
-  // subcomponent: rand facturat / acceptat / motivare
-  const DiffRow = ({ label, unit, factKey, accKey, motivKey }) => (
-    <div className="grid grid-cols-12 items-end gap-2 border-b py-2 last:border-0">
-      <span className="col-span-12 text-xs font-medium sm:col-span-3">
-        {label} {unit && <span className="text-muted-foreground">({unit})</span>}
-      </span>
-      <Input
-        className="col-span-6 h-9 sm:col-span-2"
-        inputMode="decimal"
-        value={form[factKey] ?? ""}
-        onChange={set(factKey)}
-        placeholder="facturat"
-        data-testid={`${factKey.replace(/_/g, "-")}-input`}
-      />
-      <Input
-        className="col-span-6 h-9 border-primary/40 sm:col-span-2"
-        inputMode="decimal"
-        value={form[accKey] ?? ""}
-        onChange={set(accKey)}
-        placeholder="acceptat"
-        data-testid={`${accKey.replace(/_/g, "-")}-input`}
-      />
-      <Input
-        className="col-span-12 h-9 text-[11px] sm:col-span-5"
-        value={form[motivKey] ?? ""}
-        onChange={set(motivKey)}
-        placeholder="motivare diferenta"
-        data-testid={`${motivKey.replace(/_/g, "-")}-input`}
-      />
-    </div>
-  );
+  const setUpper = (key) => (e) => patch({ [key]: e.target.value.toUpperCase() });
 
-  const CuiField = ({ label, cuiKey, nameKey, target, addrKey }) => (
-    <div className="rounded-lg border bg-muted/20 p-3">
-      <div className="flex items-end gap-2">
-        <Field label={label} id={cuiKey} className="flex-1">
-          <Input id={cuiKey} value={form[cuiKey] ?? ""} onChange={set(cuiKey)} data-testid={`${cuiKey.replace(/_/g, "-")}-input`} />
-        </Field>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-9 gap-1.5"
-          onClick={() => lookupCui(form[cuiKey], target)}
-          disabled={cuiLoading === target}
-          data-testid={`lookup-${target}-cui-button`}
-        >
-          <Search className="h-3.5 w-3.5" />
-          {cuiLoading === target ? "..." : "ANAF"}
-        </Button>
-      </div>
-      <div className="mt-2 grid grid-cols-1 gap-2">
-        <Input value={form[nameKey] ?? ""} onChange={set(nameKey)} placeholder="Nume firma" data-testid={`${nameKey.replace(/_/g, "-")}-input`} />
-        {addrKey && (
-          <Input value={form[addrKey] ?? ""} onChange={set(addrKey)} placeholder="Adresa / localitate" data-testid={`${addrKey.replace(/_/g, "-")}-input`} />
-        )}
-      </div>
-    </div>
+  // valori calculate automat (diferente reparatie)
+  const manoperaFact = round2(
+    (toNum(form.ore_tinichigerie_facturat) + toNum(form.ore_vopsitorie_facturat)) * toNum(form.ora_manopera_facturata)
   );
+  const manoperaAcc = round2(
+    (toNum(form.ore_tinichigerie) + toNum(form.ore_vopsitorie)) * toNum(form.ora_manopera_acceptata)
+  );
+  const tvaP = toNum(form.tva_percent);
+  const baseFact = toNum(form.piese_facturat) + toNum(form.materiale_facturat) + manoperaFact;
+  const baseAcc = toNum(form.piese_acceptat) + toNum(form.materiale_vopsitorie_acceptat) + manoperaAcc;
+  const valFact = round2(baseFact + (tvaP * baseFact) / 100);
+  const valAcc = round2(baseAcc + (tvaP * baseAcc) / 100);
+
+  useEffect(() => {
+    const zf = toNum(form.zile_facturate);
+    const pf = zf > 0 ? round2(toNum(form.valoare_desp_rent_facturata) / zf) : 0;
+    const upd = {};
+    if (String(manoperaFact) !== String(form.manopera_facturat)) upd.manopera_facturat = String(manoperaFact);
+    if (String(manoperaAcc) !== String(form.manopera_acceptat)) upd.manopera_acceptat = String(manoperaAcc);
+    if (String(valFact) !== String(form.valoare_desp_rep_facturata)) upd.valoare_desp_rep_facturata = String(valFact);
+    if (String(pf) !== String(form.pret_facturat)) upd.pret_facturat = String(pf);
+    if (Object.keys(upd).length) {
+      const next = { ...form, ...upd };
+      setForm(next);
+      saveForm(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -542,22 +556,22 @@ export default function RentCalculator() {
             {/* Numar dosar banner */}
             <div className="flex flex-col gap-2 rounded-xl border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
               <Label htmlFor="nr_dosar" className="font-display text-sm font-semibold">Număr dosar</Label>
-              <Input id="nr_dosar" value={form.nr_dosar} onChange={set("nr_dosar")} className="font-mono-num sm:max-w-xs" data-testid="nr-dosar-input" />
+              <Input id="nr_dosar" value={form.nr_dosar} onChange={setUpper("nr_dosar")} className="font-mono-num sm:max-w-xs" data-testid="nr-dosar-input" />
             </div>
 
             <Section icon={User} title="Date Păgubit">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Marca / Model" id="marca_model">
-                  <Input id="marca_model" value={form.marca_model} onChange={set("marca_model")} data-testid="marca-model-input" />
+                  <Input id="marca_model" value={form.marca_model} onChange={setUpper("marca_model")} data-testid="marca-model-input" />
                 </Field>
                 <Field label="Număr înmatriculare" id="numar_inmatriculare">
-                  <Input id="numar_inmatriculare" value={form.numar_inmatriculare} onChange={set("numar_inmatriculare")} data-testid="numar-inmatriculare-input" />
+                  <Input id="numar_inmatriculare" value={form.numar_inmatriculare} onChange={setUpper("numar_inmatriculare")} data-testid="numar-inmatriculare-input" />
                 </Field>
                 <Field label="Nume păgubit" id="nume_pagubit">
-                  <Input id="nume_pagubit" value={form.nume_pagubit} onChange={set("nume_pagubit")} data-testid="nume-pagubit-input" />
+                  <Input id="nume_pagubit" value={form.nume_pagubit} onChange={setUpper("nume_pagubit")} data-testid="nume-pagubit-input" />
                 </Field>
                 <Field label="Adresă păgubit" id="adresa_pagubit">
-                  <Input id="adresa_pagubit" value={form.adresa_pagubit} onChange={set("adresa_pagubit")} data-testid="adresa-pagubit-input" />
+                  <Input id="adresa_pagubit" value={form.adresa_pagubit} onChange={setUpper("adresa_pagubit")} data-testid="adresa-pagubit-input" />
                 </Field>
                 <Field label="Dată eveniment" id="data_eveniment">
                   <DateField id="data_eveniment" value={form.data_eveniment} onChange={(v) => patch({ data_eveniment: v })} testid="data-eveniment-input" />
@@ -579,67 +593,54 @@ export default function RentCalculator() {
               </div>
               <Separator className="my-4" />
               <p className="mb-2 text-xs font-medium text-muted-foreground">Cesionar (în caz de cesiune creanță)</p>
-              <CuiField label="CUI cesionar" cuiKey="cui_cesionar" nameKey="nume_cesionar" addrKey="adresa_cesionar" target="cesionar" />
+              <CuiField label="CUI cesionar" cuiKey="cui_cesionar" nameKey="nume_cesionar" addrKey="adresa_cesionar" target="cesionar" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
             </Section>
 
             <Section icon={Receipt} title="Date Factură Reparație">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Număr factură" id="rep_factura_nr">
-                  <Input id="rep_factura_nr" value={form.rep_factura_nr} onChange={set("rep_factura_nr")} data-testid="rep-factura-nr-input" />
+                  <Input id="rep_factura_nr" value={form.rep_factura_nr} onChange={setUpper("rep_factura_nr")} data-testid="rep-factura-nr-input" />
                 </Field>
                 <Field label="Dată factură" id="rep_factura_data">
                   <DateField id="rep_factura_data" value={form.rep_factura_data} onChange={(v) => patch({ rep_factura_data: v })} testid="rep-factura-data-input" />
                 </Field>
               </div>
               <div className="mt-4">
-                <CuiField label="CUI emitent factură" cuiKey="rep_cui" nameKey="rep_emitent" addrKey="rep_localitate" target="rep" />
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <Field label="Valoare despăgubire facturată (lei)" id="valoare_desp_rep_facturata">
-                  <Input id="valoare_desp_rep_facturata" inputMode="decimal" value={form.valoare_desp_rep_facturata} onChange={set("valoare_desp_rep_facturata")} data-testid="valoare-desp-rep-facturata-input" />
-                </Field>
-                <Field label="Preț oră manoperă facturat" id="ora_manopera_facturata">
-                  <Input id="ora_manopera_facturata" inputMode="decimal" value={form.ora_manopera_facturata} onChange={set("ora_manopera_facturata")} data-testid="ora-manopera-facturata-input" />
-                </Field>
-                <Field label="Preț oră manoperă acceptat" id="ora_manopera_acceptata">
-                  <Input id="ora_manopera_acceptata" inputMode="decimal" value={form.ora_manopera_acceptata} onChange={set("ora_manopera_acceptata")} data-testid="ora-manopera-acceptata-input" />
-                </Field>
+                <CuiField label="CUI emitent factură" cuiKey="rep_cui" nameKey="rep_emitent" addrKey="rep_localitate" target="rep" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
               </div>
             </Section>
 
             <Section icon={Wrench} title="Diferențe Despăgubire Reparație">
               <div className="mb-2 hidden grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
-                <span className="col-span-3">Element</span>
-                <span className="col-span-2">Facturat</span>
-                <span className="col-span-2">Acceptat</span>
-                <span className="col-span-5">Motivare diferență</span>
+                <span className="col-span-4">Element</span>
+                <span className="col-span-4">Facturat</span>
+                <span className="col-span-4">Acceptat</span>
               </div>
-              <DiffRow label="Piese" unit="lei" factKey="piese_facturat" accKey="piese_acceptat" motivKey="motivare_piese" />
-              <DiffRow label="Materiale vopsitorie" unit="lei" factKey="materiale_facturat" accKey="materiale_vopsitorie_acceptat" motivKey="motivare_materiale" />
-              <DiffRow label="Manoperă tinichigerie" unit="h" factKey="ore_tinichigerie_facturat" accKey="ore_tinichigerie" motivKey="motivare_tinichigerie" />
-              <DiffRow label="Manoperă vopsitorie" unit="h" factKey="ore_vopsitorie_facturat" accKey="ore_vopsitorie" motivKey="motivare_vopsitorie" />
-              <DiffRow label="Manoperă" unit="lei" factKey="manopera_facturat" accKey="manopera_acceptat" motivKey="motivare_manopera" />
-              <div className="mt-3 flex items-center gap-3">
+              <DiffRow label="Piese" unit="lei" factValue={form.piese_facturat} accValue={form.piese_acceptat} onFact={(v) => patch({ piese_facturat: v })} onAcc={(v) => patch({ piese_acceptat: v })} factTestid="piese-facturat-input" accTestid="piese-acceptat-input" />
+              <DiffRow label="Materiale vopsitorie" unit="lei" factValue={form.materiale_facturat} accValue={form.materiale_vopsitorie_acceptat} onFact={(v) => patch({ materiale_facturat: v })} onAcc={(v) => patch({ materiale_vopsitorie_acceptat: v })} factTestid="materiale-facturat-input" accTestid="materiale-vopsitorie-acceptat-input" />
+              <DiffRow label="Manoperă tinichigerie" unit="h" factValue={form.ore_tinichigerie_facturat} accValue={form.ore_tinichigerie} onFact={(v) => patch({ ore_tinichigerie_facturat: v })} onAcc={(v) => patch({ ore_tinichigerie: v })} factTestid="ore-tinichigerie-facturat-input" accTestid="ore-tinichigerie-input" />
+              <DiffRow label="Manoperă vopsitorie" unit="h" factValue={form.ore_vopsitorie_facturat} accValue={form.ore_vopsitorie} onFact={(v) => patch({ ore_vopsitorie_facturat: v })} onAcc={(v) => patch({ ore_vopsitorie: v })} factTestid="ore-vopsitorie-facturat-input" accTestid="ore-vopsitorie-input" />
+              <DiffRow label="Preț oră manoperă" unit="lei/h" factValue={form.ora_manopera_facturata} accValue={form.ora_manopera_acceptata} onFact={(v) => patch({ ora_manopera_facturata: v })} onAcc={(v) => patch({ ora_manopera_acceptata: v })} factTestid="ora-manopera-facturata-input" accTestid="ora-manopera-acceptata-input" />
+              <DiffRow label="Manoperă (auto)" unit="lei" factValue={String(manoperaFact)} accValue={String(manoperaAcc)} readOnly factTestid="manopera-facturat-input" accTestid="manopera-acceptat-input" />
+              <div className="my-3 flex items-center gap-3">
                 <Field label="TVA (%)" id="tva_percent" className="w-32">
                   <Input id="tva_percent" inputMode="decimal" value={form.tva_percent} onChange={set("tva_percent")} data-testid="tva-percent-input" />
                 </Field>
               </div>
-              <Field label="Motivare reparatie (text scrisoare)" id="motivare_reparatie" className="mt-3">
-                <Textarea id="motivare_reparatie" rows={2} value={form.motivare_reparatie} onChange={set("motivare_reparatie")} data-testid="motivare-reparatie-input" />
-              </Field>
+              <DiffRow label="Valoare despăgubire (auto)" unit="lei" factValue={String(valFact)} accValue={String(valAcc)} readOnly factTestid="valoare-desp-rep-facturata-input" accTestid="valoare-desp-rep-acceptata-input" />
             </Section>
 
             <Section icon={Car} title="Date Factură Lipsă de Folosință (Rent)">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Număr factură" id="rent_factura_nr">
-                  <Input id="rent_factura_nr" value={form.rent_factura_nr} onChange={set("rent_factura_nr")} data-testid="rent-factura-nr-input" />
+                  <Input id="rent_factura_nr" value={form.rent_factura_nr} onChange={setUpper("rent_factura_nr")} data-testid="rent-factura-nr-input" />
                 </Field>
                 <Field label="Dată factură" id="rent_factura_data">
                   <DateField id="rent_factura_data" value={form.rent_factura_data} onChange={(v) => patch({ rent_factura_data: v })} testid="rent-factura-data-input" />
                 </Field>
               </div>
               <div className="mt-4">
-                <CuiField label="CUI emitent factură rent" cuiKey="rent_cui" nameKey="rent_emitent" addrKey="rent_localitate" target="rent" />
+                <CuiField label="CUI emitent factură rent" cuiKey="rent_cui" nameKey="rent_emitent" addrKey="rent_localitate" target="rent" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Valoare despăgubire facturată (lei)" id="valoare_desp_rent_facturata">
@@ -649,22 +650,19 @@ export default function RentCalculator() {
                   <Input id="zile_facturate" inputMode="decimal" value={form.zile_facturate} onChange={set("zile_facturate")} data-testid="zile-facturate-input" />
                 </Field>
                 <Field label="Marca auto închiriat" id="auto_inchiriat_marca">
-                  <Input id="auto_inchiriat_marca" value={form.auto_inchiriat_marca} onChange={set("auto_inchiriat_marca")} data-testid="auto-inchiriat-marca-input" />
+                  <Input id="auto_inchiriat_marca" value={form.auto_inchiriat_marca} onChange={setUpper("auto_inchiriat_marca")} data-testid="auto-inchiriat-marca-input" />
                 </Field>
                 <Field label="Clasa auto închiriat" id="auto_inchiriat_clasa">
-                  <Input id="auto_inchiriat_clasa" value={form.auto_inchiriat_clasa} onChange={set("auto_inchiriat_clasa")} data-testid="auto-inchiriat-clasa-input" />
+                  <Input id="auto_inchiriat_clasa" value={form.auto_inchiriat_clasa} onChange={setUpper("auto_inchiriat_clasa")} data-testid="auto-inchiriat-clasa-input" />
                 </Field>
-                <Field label="Preț facturat / zi (lei)" id="pret_facturat">
-                  <Input id="pret_facturat" inputMode="decimal" value={form.pret_facturat} onChange={set("pret_facturat")} data-testid="pret-facturat-input" />
+                <Field label="Preț facturat / zi (lei)" id="pret_facturat" hint="Calculat: valoare facturată ÷ zile">
+                  <Input id="pret_facturat" inputMode="decimal" value={form.pret_facturat} readOnly className="bg-muted/60 font-semibold" data-testid="pret-facturat-input" />
                 </Field>
                 <Field label="Marca ofertă rentalcars" id="auto_oferta_marca">
-                  <Input id="auto_oferta_marca" value={form.auto_oferta_marca} onChange={set("auto_oferta_marca")} data-testid="auto-oferta-marca-input" />
+                  <Input id="auto_oferta_marca" value={form.auto_oferta_marca} onChange={setUpper("auto_oferta_marca")} data-testid="auto-oferta-marca-input" />
                 </Field>
                 <Field label="Preț ofertă / zi (lei)" id="pret_oferta">
                   <Input id="pret_oferta" inputMode="decimal" value={form.pret_oferta} onChange={set("pret_oferta")} data-testid="pret-oferta-input" />
-                </Field>
-                <Field label="Dată emitere RCA" id="data_emitere_rca" hint="Determină automat norma">
-                  <DateField id="data_emitere_rca" value={form.data_emitere_rca} onChange={(v) => patch({ data_emitere_rca: v })} testid="data-emitere-rca-input" />
                 </Field>
                 <Field label="TVA etichetă" id="tva_label">
                   <Select value={form.tva_label} onValueChange={(v) => patch({ tva_label: v })}>
@@ -682,6 +680,9 @@ export default function RentCalculator() {
 
             <Section icon={Calendar} title="Perioade & Cronologie">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Dată emitere RCA" id="data_emitere_rca" hint="Determină automat norma">
+                  <DateField id="data_emitere_rca" value={form.data_emitere_rca} onChange={(v) => patch({ data_emitere_rca: v })} testid="data-emitere-rca-input" />
+                </Field>
                 <Field label="Data avizării" id="data_avizare">
                   <DateField id="data_avizare" value={form.data_avizare} onChange={(v) => patch({ data_avizare: v })} testid="data-avizare-input" />
                 </Field>

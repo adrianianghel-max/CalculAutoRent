@@ -52,7 +52,7 @@ export function detecteazaNorma(dataEmitereRca) {
   const d = dataEmitereRca;
   if (d <= new Date(2022, 8, 10)) return "N20";
   if (d <= new Date(2023, 3, 11)) return "N18";
-  if (d <= new Date(2025, 5, 30)) return "HG298";
+  if (d <= new Date(2025, 6, 1)) return "HG298";
   return "N18 dupa incetarea HG298";
 }
 

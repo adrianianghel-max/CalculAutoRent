@@ -75,7 +75,7 @@ export const DEFAULT_FORM = {
   culpa_periods: [],
 
   // ---- SCRISOARE ----
-  motivare_reparatie: "cf. deviz Audatex refacut. Abuz rep adaos la piese si ora de manopera.",
+  motivare_reparatie: "",
   observatii: DEFAULT_OBSERVATII,
   semnatura: DEFAULT_SEMNATURA,
 };
