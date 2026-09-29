@@ -180,8 +180,8 @@ export function calculeaza(form) {
   const sumaRent =
     ofertaMajorata < pretFacturat ? round2(pretOferta * zileRent) : round2(pretFacturat * zileRent);
 
-  const rentTotal = rentStart && rentEnd ? Math.round((rentEnd - rentStart) / 86400000) : 0;
-  const repTotal = repStart && repEnd ? Math.round((repEnd - repStart) / 86400000) : 0;
+  const rentTotal = rentStart && rentEnd ? Math.max(0, Math.round((rentEnd - rentStart) / 86400000) + 1) : 0;
+  const repTotal = repStart && repEnd ? Math.max(0, Math.round((repEnd - repStart) / 86400000) + 1) : 0;
 
   // ---------- scrisoare ----------
   const motivareRep = String(form.motivare_reparatie || "").trim();
