@@ -48,6 +48,7 @@ import {
   saveHolidays,
 } from "@/lib/rentDefaults";
 import { calculeaza } from "@/lib/rcaCalc";
+import { periodDays } from "@/lib/rentTable";
 import { exportExcel } from "@/lib/exportExcel";
 import {
   readPdfText,
@@ -96,13 +97,14 @@ const dateToDdmmyyyy = (d) => {
 };
 
 // Camp de data: input text dd/mm/yyyy + buton calendar (popover) pentru selectie.
-function DateField({ id, value, onChange, testid }) {
+function DateField({ id, value, onChange, testid, label }) {
   const [open, setOpen] = useState(false);
   const selected = ddmmyyyyToDate(value);
   return (
     <div className="relative">
       <Input
         id={id}
+        aria-label={label}
         value={value || ""}
         inputMode="numeric"
         placeholder="zz/ll/aaaa"
@@ -115,7 +117,7 @@ function DateField({ id, value, onChange, testid }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label="Deschide calendar"
+            aria-label={label ? `Calendar: ${label}` : "Deschide calendar"}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
             data-testid={`${testid}-calendar-trigger`}
           >
@@ -178,6 +180,17 @@ function Section({ icon: Icon, title, children, action, tone }) {
       </div>
       <div className="p-4">{children}</div>
     </motion.section>
+  );
+}
+
+function RentRow({ label, fact, accepted, detail, testid }) {
+  return (
+    <tr className="border-b last:border-b-0" data-testid={testid}>
+      <th scope="row" className="px-3 py-2 text-left text-sm font-medium">{label}</th>
+      <td className="px-2 py-2 align-middle">{fact}</td>
+      <td className="px-2 py-2 align-middle">{accepted}</td>
+      <td className="px-2 py-2 align-middle text-sm">{detail}</td>
+    </tr>
   );
 }
 
@@ -525,6 +538,27 @@ export default function RentCalculator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form]);
 
+  const rentSummary = useMemo(() => calculeaza({
+    ...form,
+    manopera_acceptat: String(manoperaAcc),
+    pret_facturat: String(toNum(form.zile_facturate) > 0 ? round2(toNum(form.valoare_desp_rent_facturata) / toNum(form.zile_facturate)) : 0),
+    culpa_periods: (form.culpa_periods || []).map((p) => ({ ...p, label: culpaTypeName(p.type) })),
+    holidays,
+  }), [form, holidays, manoperaAcc]);
+
+  const tablePeriods = ["reconstatare", "comanda_piese", "antifrauda"].flatMap((type) => {
+    const periods = (form.culpa_periods || []).filter((p) => p.type === type);
+    return periods.length ? periods : type === "comanda_piese" ? [] : [{ type, start: "", end: "" }];
+  });
+  const editTablePeriod = (period, key, value) => {
+    if (period.id) updateCulpa(period.id, key, value);
+    else patch({ culpa_periods: [...(form.culpa_periods || []), { ...period, id: `${Date.now()}-${period.type}`, [key]: value }] });
+  };
+  const dayLabel = (start, end, inclusive = false) => {
+    const days = periodDays(start, end, inclusive);
+    return days === null ? "—" : `${days} ${days === 1 ? "zi" : "zile"}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <input ref={fileRef} type="file" accept="application/pdf" multiple className="hidden" onChange={onFiles} data-testid="pdf-file-input" />
@@ -647,116 +681,45 @@ export default function RentCalculator() {
               <div className="mt-4">
                 <CuiField label="CUI emitent factură rent" cuiKey="rent_cui" nameKey="rent_emitent" addrKey="rent_localitate" target="rent" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
               </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Valoare despăgubire facturată (lei)" id="valoare_desp_rent_facturata">
-                  <Input id="valoare_desp_rent_facturata" inputMode="decimal" value={form.valoare_desp_rent_facturata} onChange={set("valoare_desp_rent_facturata")} data-testid="valoare-desp-rent-facturata-input" />
-                </Field>
-                <Field label="Zile facturate" id="zile_facturate" hint="Plafon maxim de zile">
-                  <Input id="zile_facturate" inputMode="decimal" value={form.zile_facturate} onChange={set("zile_facturate")} data-testid="zile-facturate-input" />
-                </Field>
-                <Field label="Marca auto închiriat" id="auto_inchiriat_marca">
-                  <Input id="auto_inchiriat_marca" value={form.auto_inchiriat_marca} onChange={setUpper("auto_inchiriat_marca")} data-testid="auto-inchiriat-marca-input" />
-                </Field>
-                <Field label="Clasa auto închiriat" id="auto_inchiriat_clasa">
-                  <Input id="auto_inchiriat_clasa" value={form.auto_inchiriat_clasa} onChange={setUpper("auto_inchiriat_clasa")} data-testid="auto-inchiriat-clasa-input" />
-                </Field>
-                <Field label="Preț facturat / zi (lei)" id="pret_facturat" hint="Calculat: valoare facturată ÷ zile">
-                  <Input id="pret_facturat" inputMode="decimal" value={form.pret_facturat} readOnly className="bg-muted/60 font-semibold" data-testid="pret-facturat-input" />
-                </Field>
-                <Field label="Marca ofertă rentalcars" id="auto_oferta_marca">
-                  <Input id="auto_oferta_marca" value={form.auto_oferta_marca} onChange={setUpper("auto_oferta_marca")} data-testid="auto-oferta-marca-input" />
-                </Field>
-                <Field label="Preț ofertă / zi (lei)" id="pret_oferta">
-                  <Input id="pret_oferta" inputMode="decimal" value={form.pret_oferta} onChange={set("pret_oferta")} data-testid="pret-oferta-input" />
-                </Field>
-                <Field label="TVA etichetă" id="tva_label">
-                  <Select value={form.tva_label} onValueChange={(v) => patch({ tva_label: v })}>
-                    <SelectTrigger id="tva_label" data-testid="tva-label-select">
-                      <SelectValue placeholder="Alege" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CU TVA" data-testid="tva-cu-option">CU TVA</SelectItem>
-                      <SelectItem value="FĂRĂ TVA" data-testid="tva-fara-option">FĂRĂ TVA</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-            </Section>
-
-            <Section icon={Calendar} title="Perioade & Cronologie" tone="rent">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Dată emitere RCA" id="data_emitere_rca" hint="Determină automat norma">
-                  <DateField id="data_emitere_rca" value={form.data_emitere_rca} onChange={(v) => patch({ data_emitere_rca: v })} testid="data-emitere-rca-input" />
-                </Field>
-                <Field label="Data avizării" id="data_avizare">
-                  <DateField id="data_avizare" value={form.data_avizare} onChange={(v) => patch({ data_avizare: v })} testid="data-avizare-input" />
-                </Field>
-                <Field label="Data constatării" id="data_constatare">
-                  <DateField id="data_constatare" value={form.data_constatare} onChange={(v) => patch({ data_constatare: v })} testid="data-constatare-input" />
-                </Field>
-                <Field label="Perioada rent - început" id="rent_start">
-                  <DateField id="rent_start" value={form.rent_start} onChange={(v) => patch({ rent_start: v })} testid="rent-start-input" />
-                </Field>
-                <Field label="Perioada rent - sfârșit" id="rent_end">
-                  <DateField id="rent_end" value={form.rent_end} onChange={(v) => patch({ rent_end: v })} testid="rent-end-input" />
-                </Field>
-                <Field label="Perioada reparație - început" id="rep_start">
-                  <DateField id="rep_start" value={form.rep_start} onChange={(v) => patch({ rep_start: v })} testid="rep-start-input" />
-                </Field>
-                <Field label="Perioada reparație - sfârșit" id="rep_end">
-                  <DateField id="rep_end" value={form.rep_end} onChange={(v) => patch({ rep_end: v })} testid="rep-end-input" />
-                </Field>
-              </div>
-
               <Separator className="my-4" />
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Perioade de culpă (opțional) — fiecare zi se adaugă integral; intersecțiile se numără o singură dată
-                </p>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => addCulpa("reconstatare")} data-testid="add-reconstatare-button">
-                    <Plus className="h-3 w-3" /> Reconstatare
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => addCulpa("comanda_piese")} data-testid="add-comanda-piese-button">
-                    <Plus className="h-3 w-3" /> Comandă piese
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => addCulpa("antifrauda")} data-testid="add-antifrauda-button">
-                    <Plus className="h-3 w-3" /> Antifraudă
-                  </Button>
-                </div>
+              <h4 className="mb-3 font-display text-sm font-semibold">Perioade & Cronologie</h4>
+              <div className="overflow-x-auto rounded-lg border border-green-300 bg-white/30 dark:border-green-800 dark:bg-black/10">
+                <table className="w-full min-w-[680px] table-fixed" data-testid="rent-periods-table">
+                  <caption className="sr-only">Date rent și perioade: valori facturate și acceptate</caption>
+                  <colgroup><col className="w-[30%]" /><col className="w-[25%]" /><col className="w-[25%]" /><col className="w-[20%]" /></colgroup>
+                  <thead className="border-b border-green-300 bg-green-200/60 dark:border-green-800 dark:bg-green-800/40">
+                    <tr>
+                      <th scope="col" className="px-3 py-3 text-left text-sm"><span className="sr-only">Element</span></th>
+                      <th scope="col" className="px-2 py-3 text-left text-sm font-semibold">VALOARE FACTURATĂ</th>
+                      <th scope="col" className="px-2 py-3 text-left text-sm font-semibold">VALOARE ACCEPTATĂ</th>
+                      <th scope="col" className="px-2 py-3 text-left text-sm"><span className="sr-only">Detalii</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <RentRow label="VALOARE DESPĂGUBIRE" fact={<Input id="valoare_desp_rent_facturata" aria-label="Valoare despăgubire facturată (lei)" inputMode="decimal" value={form.valoare_desp_rent_facturata} onChange={set("valoare_desp_rent_facturata")} data-testid="valoare-desp-rent-facturata-input" />} accepted={<Input aria-label="Valoare despăgubire acceptată (lei)" value={money(rentSummary.suma_rent)} readOnly className="bg-white/40 font-semibold dark:bg-black/10" data-testid="valoare-desp-rent-acceptata-input" />} detail="lei" />
+                    <RentRow label="ZILE DE ÎNCHIRIERE" fact={<Input id="zile_facturate" aria-label="Zile facturate" inputMode="decimal" value={form.zile_facturate} onChange={set("zile_facturate")} data-testid="zile-facturate-input" />} accepted={<Input aria-label="Zile acceptate" value={rentSummary.zile_rent.toFixed(2)} readOnly className="bg-white/40 font-semibold dark:bg-black/10" data-testid="zile-acceptate-input" />} detail={<span className="font-semibold text-primary" data-testid="rent-norma">{rentSummary.norma}</span>} />
+                    <RentRow label="MARCA / NR AUTO ÎNCHIRIATĂ" fact={<Input id="auto_inchiriat_marca" aria-label="Marca / număr auto închiriat" value={form.auto_inchiriat_marca} onChange={setUpper("auto_inchiriat_marca")} data-testid="auto-inchiriat-marca-input" />} accepted={<Input id="auto_inchiriat_clasa" aria-label="Clasa auto închiriat" value={form.auto_inchiriat_clasa} onChange={setUpper("auto_inchiriat_clasa")} data-testid="auto-inchiriat-clasa-input" />} detail={<div className="flex items-center gap-1"><Input id="pret_facturat" aria-label="Preț facturat pe zi" value={form.pret_facturat} readOnly className="px-2 bg-white/40 font-semibold dark:bg-black/10" data-testid="pret-facturat-input" /><span className="shrink-0 text-xs">lei/zi</span></div>} />
+                    <RentRow label="MARCA / OFERTĂ RENT" fact={<Input id="auto_oferta_marca" aria-label="Marca ofertă rent" value={form.auto_oferta_marca} onChange={setUpper("auto_oferta_marca")} data-testid="auto-oferta-marca-input" />} detail={<div className="flex items-center gap-1"><Input id="pret_oferta" aria-label="Preț ofertă pe zi" inputMode="decimal" value={form.pret_oferta} onChange={set("pret_oferta")} className="px-2" data-testid="pret-oferta-input" /><span className="shrink-0 text-xs">lei/zi</span></div>} />
+                    <RentRow label="DATA EMITERE RCA" fact={<DateField id="data_emitere_rca" label="Data emitere RCA" value={form.data_emitere_rca} onChange={(v) => patch({ data_emitere_rca: v })} testid="data-emitere-rca-input" />} detail={<Select value={form.tva_label} onValueChange={(v) => patch({ tva_label: v })}><SelectTrigger id="tva_label" aria-label="TVA etichetă" data-testid="tva-label-select"><SelectValue placeholder="Alege" /></SelectTrigger><SelectContent><SelectItem value="CU TVA" data-testid="tva-cu-option">CU TVA</SelectItem><SelectItem value="FĂRĂ TVA" data-testid="tva-fara-option">FĂRĂ TVA</SelectItem></SelectContent></Select>} />
+                    <RentRow label="DATA EMITERE DIR" fact={<DateField id="data_avizare" label="Data emitere DIR / avizare" value={form.data_avizare} onChange={(v) => patch({ data_avizare: v })} testid="data-avizare-input" />} />
+                    <RentRow label="PERIOADA RENT" fact={<DateField id="rent_start" label="Perioada rent — început" value={form.rent_start} onChange={(v) => patch({ rent_start: v })} testid="rent-start-input" />} accepted={<DateField id="rent_end" label="Perioada rent — sfârșit" value={form.rent_end} onChange={(v) => patch({ rent_end: v })} testid="rent-end-input" />} detail={<span data-testid="rent-period-days">{dayLabel(form.rent_start, form.rent_end)}</span>} />
+                    <RentRow label="PERIOADA REP" fact={<DateField id="rep_start" label="Perioada reparație — început" value={form.rep_start} onChange={(v) => patch({ rep_start: v })} testid="rep-start-input" />} accepted={<DateField id="rep_end" label="Perioada reparație — sfârșit" value={form.rep_end} onChange={(v) => patch({ rep_end: v })} testid="rep-end-input" />} detail={<span data-testid="rep-period-days">{dayLabel(form.rep_start, form.rep_end)}</span>} />
+                    {tablePeriods.map((p, idx, arr) => {
+                      const number = arr.slice(0, idx + 1).filter((q) => q.type === p.type).length;
+                      const code = p.type === "reconstatare" ? "REC" : p.type === "comanda_piese" ? "CP" : "AF";
+                      const formIndex = p.id ? form.culpa_periods.findIndex((q) => q.id === p.id) : `empty-${p.type}`;
+                      const periodLabel = `${culpaTypeName(p.type)} ${number}`;
+                      return <RentRow key={`${p.type}-${number}`} label={<span data-testid={`culpa-period-label-${formIndex}`}>PERIOADA {code}{number > 1 ? ` ${number}` : ""}</span>} testid={`culpa-period-row-${formIndex}`} fact={<DateField id={`culpa_start_${formIndex}`} label={`${periodLabel} — început`} value={p.start || ""} onChange={(v) => editTablePeriod(p, "start", v)} testid={`culpa-start-input-${formIndex}`} />} accepted={<DateField id={`culpa_end_${formIndex}`} label={`${periodLabel} — sfârșit`} value={p.end || ""} onChange={(v) => editTablePeriod(p, "end", v)} testid={`culpa-end-input-${formIndex}`} />} detail={<div className="flex items-center justify-between gap-1"><span>{dayLabel(p.start, p.end, true)}</span>{p.id && <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeCulpa(p.id)} data-testid={`remove-culpa-period-${formIndex}`} aria-label={`Șterge ${periodLabel}`}><Trash2 className="h-3.5 w-3.5" /></Button>}</div>} />;
+                    })}
+                    <RentRow label="DATA CONSTATĂRII" fact={<DateField id="data_constatare" label="Data constatării" value={form.data_constatare} onChange={(v) => patch({ data_constatare: v })} testid="data-constatare-input" />} />
+                  </tbody>
+                </table>
               </div>
-
-              {(form.culpa_periods || []).length === 0 ? (
-                <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-4 text-center text-[11px] text-muted-foreground">
-                  Nicio perioadă de culpă adăugată. Folosește butoanele de mai sus (Reconstatare 1, 2… / Comandă piese 1, 2… / Antifraudă 1, 2…).
-                </p>
-              ) : (
-                <div className="space-y-3" data-testid="culpa-periods-list">
-                  {(form.culpa_periods || []).map((p, idx, arr) => (
-                    <div key={p.id} className="rounded-lg border bg-muted/20 p-3" data-testid={`culpa-period-row-${idx}`}>
-                      <div className="mb-2 flex items-center justify-between">
-                        <span
-                          className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${CULPA_BADGE[p.type] || CULPA_BADGE.reconstatare}`}
-                          data-testid={`culpa-period-label-${idx}`}
-                        >
-                          {culpaTypeName(p.type)} {culpaNumber(arr, idx)}
-                        </span>
-                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeCulpa(p.id)} data-testid={`remove-culpa-period-${idx}`} aria-label="Sterge perioada">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Field label="Început" id={`culpa_start_${idx}`}>
-                          <DateField id={`culpa_start_${idx}`} value={p.start || ""} onChange={(v) => updateCulpa(p.id, "start", v)} testid={`culpa-start-input-${idx}`} />
-                        </Field>
-                        <Field label="Sfârșit" id={`culpa_end_${idx}`}>
-                          <DateField id={`culpa_end_${idx}`} value={p.end || ""} onChange={(v) => updateCulpa(p.id, "end", v)} testid={`culpa-end-input-${idx}`} />
-                        </Field>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => addCulpa("reconstatare")} data-testid="add-reconstatare-button"><Plus className="h-3 w-3" /> Reconstatare</Button>
+                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => addCulpa("comanda_piese")} data-testid="add-comanda-piese-button"><Plus className="h-3 w-3" /> Comandă piese</Button>
+                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => addCulpa("antifrauda")} data-testid="add-antifrauda-button"><Plus className="h-3 w-3" /> Antifraudă</Button>
+              </div>
             </Section>
 
             <div className="flex flex-wrap items-center gap-3">
