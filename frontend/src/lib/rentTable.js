@@ -1,5 +1,5 @@
-// Zile calendaristice între date; perioadele de culpă includ ambele capete.
-export function periodDays(start, end, inclusive = false) {
+// Zile calendaristice între date, incluzând ambele capete.
+export function periodDays(start, end, inclusive = true) {
   const timestamp = (value) => {
     const match = String(value || "").match(/^(\d{2})[./](\d{2})[./](\d{4})$/);
     if (!match) return null;
