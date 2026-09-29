@@ -153,13 +153,19 @@ function Field({ label, id, children, hint, className }) {
   );
 }
 
-function Section({ icon: Icon, title, children, action }) {
+function Section({ icon: Icon, title, children, action, tone }) {
+  const background = tone === "repair"
+    ? "bg-green-50 dark:bg-green-950/30"
+    : tone === "rent"
+      ? "bg-green-100 dark:bg-green-900/40"
+      : "bg-card";
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="rounded-xl border bg-card shadow-sm overflow-hidden"
+      className={`rounded-xl border ${background} shadow-sm overflow-hidden`}
     >
       <div className="flex items-center justify-between gap-2.5 border-b bg-muted/40 px-4 py-3">
         <div className="flex items-center gap-2.5">
@@ -595,7 +601,7 @@ export default function RentCalculator() {
               <CuiField label="CUI cesionar" cuiKey="cui_cesionar" nameKey="nume_cesionar" addrKey="adresa_cesionar" target="cesionar" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
             </Section>
 
-            <Section icon={Receipt} title="Date Factură Reparație">
+            <Section icon={Receipt} title="Date Factură Reparație" tone="repair">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Număr factură" id="rep_factura_nr">
                   <Input id="rep_factura_nr" value={form.rep_factura_nr} onChange={setUpper("rep_factura_nr")} data-testid="rep-factura-nr-input" />
@@ -609,7 +615,7 @@ export default function RentCalculator() {
               </div>
             </Section>
 
-            <Section icon={Wrench} title="Diferențe Despăgubire Reparație">
+            <Section icon={Wrench} title="Diferențe Despăgubire Reparație" tone="repair">
               <div className="mb-2 hidden grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
                 <span className="col-span-4">Element</span>
                 <span className="col-span-4">Facturat</span>
@@ -629,7 +635,7 @@ export default function RentCalculator() {
               <DiffRow label="Valoare despăgubire (auto)" unit="lei" factValue={String(valFact)} accValue={String(valAcc)} readOnly factTestid="valoare-desp-rep-facturata-input" accTestid="valoare-desp-rep-acceptata-input" />
             </Section>
 
-            <Section icon={Car} title="Date Factură Lipsă de Folosință (Rent)">
+            <Section icon={Car} title="Date Factură Lipsă de Folosință (Rent)" tone="rent">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Număr factură" id="rent_factura_nr">
                   <Input id="rent_factura_nr" value={form.rent_factura_nr} onChange={setUpper("rent_factura_nr")} data-testid="rent-factura-nr-input" />
