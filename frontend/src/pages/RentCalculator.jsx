@@ -683,7 +683,7 @@ export default function RentCalculator() {
               </div>
             </Section>
 
-            <Section icon={Calendar} title="Perioade & Cronologie">
+            <Section icon={Calendar} title="Perioade & Cronologie" tone="rent">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Dată emitere RCA" id="data_emitere_rca" hint="Determină automat norma">
                   <DateField id="data_emitere_rca" value={form.data_emitere_rca} onChange={(v) => patch({ data_emitere_rca: v })} testid="data-emitere-rca-input" />
