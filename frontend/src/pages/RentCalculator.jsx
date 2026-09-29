@@ -253,6 +253,7 @@ function CuiField({ label, cuiKey, nameKey, addrKey, target, form, patch, lookup
 
 export default function RentCalculator() {
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, culpa_periods: [] }));
+  const [showRepairPeriod, setShowRepairPeriod] = useState(false);
   const [holidays, setHolidays] = useState([]);
   const [result, setResult] = useState(null);
   const [letter, setLetter] = useState("");
@@ -548,13 +549,13 @@ export default function RentCalculator() {
 
   const tablePeriods = ["reconstatare", "comanda_piese", "antifrauda"].flatMap((type) => {
     const periods = (form.culpa_periods || []).filter((p) => p.type === type);
-    return periods.length ? periods : type === "comanda_piese" ? [] : [{ type, start: "", end: "" }];
+    return periods;
   });
   const editTablePeriod = (period, key, value) => {
     if (period.id) updateCulpa(period.id, key, value);
     else patch({ culpa_periods: [...(form.culpa_periods || []), { ...period, id: `${Date.now()}-${period.type}`, [key]: value }] });
   };
-  const dayLabel = (start, end, inclusive = false) => {
+  const dayLabel = (start, end, inclusive = true) => {
     const days = periodDays(start, end, inclusive);
     return days === null ? "—" : `${days} ${days === 1 ? "zi" : "zile"}`;
   };
@@ -703,7 +704,7 @@ export default function RentCalculator() {
                     <RentRow label="DATA EMITERE RCA" fact={<DateField id="data_emitere_rca" label="Data emitere RCA" value={form.data_emitere_rca} onChange={(v) => patch({ data_emitere_rca: v })} testid="data-emitere-rca-input" />} detail={<Select value={form.tva_label} onValueChange={(v) => patch({ tva_label: v })}><SelectTrigger id="tva_label" aria-label="TVA etichetă" data-testid="tva-label-select"><SelectValue placeholder="Alege" /></SelectTrigger><SelectContent><SelectItem value="CU TVA" data-testid="tva-cu-option">CU TVA</SelectItem><SelectItem value="FĂRĂ TVA" data-testid="tva-fara-option">FĂRĂ TVA</SelectItem></SelectContent></Select>} />
                     <RentRow label="DATA EMITERE DIR" fact={<DateField id="data_avizare" label="Data emitere DIR / avizare" value={form.data_avizare} onChange={(v) => patch({ data_avizare: v })} testid="data-avizare-input" />} />
                     <RentRow label="PERIOADA RENT" fact={<DateField id="rent_start" label="Perioada rent — început" value={form.rent_start} onChange={(v) => patch({ rent_start: v })} testid="rent-start-input" />} accepted={<DateField id="rent_end" label="Perioada rent — sfârșit" value={form.rent_end} onChange={(v) => patch({ rent_end: v })} testid="rent-end-input" />} detail={<span data-testid="rent-period-days">{dayLabel(form.rent_start, form.rent_end)}</span>} />
-                    <RentRow label="PERIOADA REP" fact={<DateField id="rep_start" label="Perioada reparație — început" value={form.rep_start} onChange={(v) => patch({ rep_start: v })} testid="rep-start-input" />} accepted={<DateField id="rep_end" label="Perioada reparație — sfârșit" value={form.rep_end} onChange={(v) => patch({ rep_end: v })} testid="rep-end-input" />} detail={<span data-testid="rep-period-days">{dayLabel(form.rep_start, form.rep_end)}</span>} />
+                    {showRepairPeriod && <RentRow label="PERIOADA REP" fact={<DateField id="rep_start" label="Perioada reparație — început" value={form.rep_start} onChange={(v) => patch({ rep_start: v })} testid="rep-start-input" />} accepted={<DateField id="rep_end" label="Perioada reparație — sfârșit" value={form.rep_end} onChange={(v) => patch({ rep_end: v })} testid="rep-end-input" />} detail={<span data-testid="rep-period-days">{dayLabel(form.rep_start, form.rep_end)}</span>} />}
                     {tablePeriods.map((p, idx, arr) => {
                       const number = arr.slice(0, idx + 1).filter((q) => q.type === p.type).length;
                       const code = p.type === "reconstatare" ? "REC" : p.type === "comanda_piese" ? "CP" : "AF";
@@ -716,6 +717,7 @@ export default function RentCalculator() {
                 </table>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
+                {!showRepairPeriod && <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => setShowRepairPeriod(true)} data-testid="add-reparatie-button"><Plus className="h-3 w-3" /> Reparație</Button>}
                 <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => addCulpa("reconstatare")} data-testid="add-reconstatare-button"><Plus className="h-3 w-3" /> Reconstatare</Button>
                 <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => addCulpa("comanda_piese")} data-testid="add-comanda-piese-button"><Plus className="h-3 w-3" /> Comandă piese</Button>
                 <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => addCulpa("antifrauda")} data-testid="add-antifrauda-button"><Plus className="h-3 w-3" /> Antifraudă</Button>
