@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only retest of focus-loss bug fix + new auto-calc/uppercase/move/remove changes on Romanian RCA rental calculator. All targeted features PASS. Multi-character typing works without focus loss on CUI + Diferente fields (page.type with delay). Uppercase-on-type works. Auto-calc for manopera and valoare_desp_rep (facturat + acceptat) works; fields are read-only and update live. pret_facturat auto = valoare/zile works and is read-only. Removed fields absent. data-emitere-rca is placed BEFORE data-avizare in DOM inside 'Perioade & Cronologie' section (they render on the same visual row via sm:grid-cols-2, which is expected). Regression calc after clearing localStorage: zile=15, suma=5.445,00, valoare_reparatie=39.347,19, norma='N18 dupa incetarea HG298'. Excel export downloads 'Fisa dosarului RCA U21201993163.xlsm' successfully, no console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RentCalculator.jsx is 869 lines - consider splitting DateField, Section, CuiField, DiffRow, Kpi, Field into separate component files for maintainability.",
+    "useEffect that syncs computed fields depends on entire form object; may cause extra renders. Consider deriving purely computed values (manoperaFact/valFact/pret) at render time only and persisting to storage only when needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "seed_data_creation": "None; used default form after localStorage clear.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Focus-loss bug fixed by making DiffRow and CuiField module-level components. Typed multi-digit CUI (37686707) and decimals (46380.02) with 60-80ms delay per char -- values fully retained. Uppercase transforms on nume/marca/inmatriculare/adresa. Auto-calcs: manoperaAcc=100*(10+10.5)=2050 verified; pret_facturat: 10890/30=363, 10890/15=726 verified. data-emitere-rca DOM-order-before data-avizare within Perioade & Cronologie section. Regression numbers exact match. Export downloads 'Fisa dosarului RCA U21201993163.xlsm'.",
+  "rca of the issue": "Original focus loss caused by DiffRow/CuiField being redeclared inside the parent RentCalculator component on every render, forcing React to unmount/remount the child Inputs and losing focus. Fix: hoisted both components to module scope. Verified typing character-by-character retains focus."
+}

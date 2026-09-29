@@ -41,10 +41,8 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HolidayManager } from "@/components/HolidayManager";
 import {
-  DEFAULT_FORM,
   EMPTY_FORM,
   DEFAULT_EMAIL_TO,
-  loadForm,
   saveForm,
   loadHolidays,
   saveHolidays,
@@ -235,7 +233,7 @@ function CuiField({ label, cuiKey, nameKey, addrKey, target, form, patch, lookup
 }
 
 export default function RentCalculator() {
-  const [form, setForm] = useState(loadForm);
+  const [form, setForm] = useState(() => ({ ...EMPTY_FORM, culpa_periods: [] }));
   const [holidays, setHolidays] = useState([]);
   const [result, setResult] = useState(null);
   const [letter, setLetter] = useState("");
@@ -464,11 +462,12 @@ export default function RentCalculator() {
   };
 
   const resetForm = () => {
-    setForm(DEFAULT_FORM);
-    saveForm(DEFAULT_FORM);
+    const empty = { ...EMPTY_FORM, culpa_periods: [] };
+    setForm(empty);
+    saveForm(empty);
     setResult(null);
     setLetter("");
-    toast.success("Formular resetat la exemplul implicit.");
+    toast.success("Formular golit.");
   };
 
   const clearForm = () => {
