@@ -188,8 +188,8 @@ def calculeaza(payload: dict) -> dict:
     else:
         suma_rent = round(pret_facturat * zile_rent, 2)
 
-    rent_total = (rent_end - rent_start).days if (rent_start and rent_end) else 0
-    rep_total = (rep_end - rep_start).days if (rep_start and rep_end) else 0
+    rent_total = max(0, (rent_end - rent_start).days + 1) if (rent_start and rent_end) else 0
+    rep_total = max(0, (rep_end - rep_start).days + 1) if (rep_start and rep_end) else 0
 
     # ---------- construire scrisoare ----------
     motivare_rep = str(payload.get("motivare_reparatie", "") or "").strip()
