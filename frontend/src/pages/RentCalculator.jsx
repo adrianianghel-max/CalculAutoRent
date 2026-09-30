@@ -50,14 +50,8 @@ import {
 import { calculeaza } from "@/lib/rcaCalc";
 import { periodDays } from "@/lib/rentTable";
 import { exportExcel } from "@/lib/exportExcel";
-import {
-  readPdfText,
-  readHighlights,
-  extractNc,
-  extractPolita,
-  classifyHighlights,
-  terminateOcr,
-} from "@/lib/pdfExtract";
+import { readPdfPages, terminateOcr } from "@/lib/pdfExtract";
+import { PdfImportReview } from "@/components/PdfImportReview";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -260,6 +254,9 @@ export default function RentCalculator() {
   const [dark, setDark] = useState(false);
   const [cuiLoading, setCuiLoading] = useState("");
   const [parsing, setParsing] = useState(false);
+  const [pdfDocuments, setPdfDocuments] = useState([]);
+  const [pdfProgress, setPdfProgress] = useState("");
+  const pdfAbort = useRef(null);
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
 
@@ -336,70 +333,29 @@ export default function RentCalculator() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setParsing(true);
-    const changes = {};
-    const cuis = [];
-    const numbers = [];
-    const dates = [];
-    let pagubitAddr = "";
-    const filled = [];
+    setPdfDocuments([]);
+    const controller = new AbortController();
+    pdfAbort.current = controller;
+    const documents = [];
     try {
       for (const file of files) {
-        const name = file.name.toLowerCase();
-        let text = "";
+        if (controller.signal.aborted) break;
         try {
-          text = await readPdfText(file);
-        } catch (err) {
-          toast.error(`Nu am putut citi ${file.name}`);
-          continue;
-        }
-        const looksPolita = name.includes("polita") || /date given/i.test(text);
-        const looksNc = name.includes("nc") || /dosar\s+daune/i.test(text);
-
-        if (looksNc) {
-          const nc = extractNc(text);
-          if (nc.nr_dosar) { changes.nr_dosar = nc.nr_dosar; filled.push("nr dosar"); }
-          if (nc.numar_inmatriculare) { changes.numar_inmatriculare = nc.numar_inmatriculare; filled.push("nr inmatriculare"); }
-          if (nc.marca_model) { changes.marca_model = nc.marca_model; filled.push("marca/model"); }
-          if (nc.nume_pagubit) { changes.nume_pagubit = nc.nume_pagubit; filled.push("nume pagubit"); }
-          if (nc.data_eveniment) { changes.data_eveniment = nc.data_eveniment; filled.push("data eveniment"); }
-          if (nc.data_avizare) { changes.data_avizare = nc.data_avizare; filled.push("data avizare/notificare"); }
-        }
-        if (looksPolita) {
-          const pol = extractPolita(text);
-          if (pol.data_emitere_rca) { changes.data_emitere_rca = pol.data_emitere_rca; filled.push("data emitere RCA"); }
-        }
-        // marcaje galbene -> CUI-uri, numere/date factura, adresa pagubit
-        try {
-          const hl = await readHighlights(file, { ocr: true });
-          const cls = classifyHighlights(hl);
-          cls.cuis.forEach((x) => cuis.push(x));
-          cls.numbers.forEach((x) => numbers.push(x));
-          cls.dates.forEach((x) => dates.push(x));
-          if (!pagubitAddr && cls.addresses.length) pagubitAddr = cls.addresses[0];
-        } catch (err) {
-          /* fara highlight-uri sau PDF scanat fara strat de text */
+          const pages = await readPdfPages(file, {
+            signal: controller.signal,
+            onProgress: (message) => setPdfProgress(`${file.name} • ${message}`),
+          });
+          documents.push({ name: file.name, pages });
+        } catch (error) {
+          if (!controller.signal.aborted) toast.error(`Nu am putut citi ${file.name}. ${error.message || "Verifică PDF-ul."}`);
         }
       }
-
-      if (pagubitAddr) { changes.adresa_pagubit = pagubitAddr; filled.push("adresa pagubit"); }
-      // CUI-uri in ordinea de citire: blocul reparatie primul, apoi rent (cesionar = reparator implicit)
-      if (cuis[0]) { changes.cui_cesionar = cuis[0]; changes.rep_cui = cuis[0]; filled.push("CUI reparatie/cesionar"); }
-      if (cuis[1]) { changes.rent_cui = cuis[1]; filled.push("CUI rent"); }
-      // Facturi: nr+data reparatie (primul bloc), nr+data rent (al doilea bloc)
-      if (numbers[0]) { changes.rep_factura_nr = numbers[0]; filled.push("nr factura reparatie"); }
-      if (dates[0]) { changes.rep_factura_data = dates[0]; filled.push("data factura reparatie"); }
-      if (numbers[1]) { changes.rent_factura_nr = numbers[1]; filled.push("nr factura rent"); }
-      if (dates[1]) { changes.rent_factura_data = dates[1]; filled.push("data factura rent"); }
-
-      if (Object.keys(changes).length) {
-        patch(changes);
-        toast.success(`Date culese din PDF: ${filled.join(", ")}.`);
-      } else {
-        toast.info("Nu am gasit campuri recunoscute in fisierele incarcate.");
-      }
+      if (!controller.signal.aborted) setPdfDocuments(documents);
     } finally {
-      terminateOcr().catch(() => {});
+      await terminateOcr().catch(() => {});
+      pdfAbort.current = null;
       setParsing(false);
+      setPdfProgress("");
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -481,7 +437,9 @@ export default function RentCalculator() {
   };
 
   const resetForm = () => {
+    pdfAbort.current?.abort();
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
+    setPdfDocuments([]);
     setForm(empty);
     saveForm(empty);
     setResult(null);
@@ -491,6 +449,7 @@ export default function RentCalculator() {
 
   const clearForm = () => {
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
+    setPdfDocuments([]);
     setForm(empty);
     saveForm(empty);
     setResult(null);
@@ -589,6 +548,9 @@ export default function RentCalculator() {
       </header>
 
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+        {parsing && <div role="status" className="mb-4 rounded-lg border p-3 text-sm">{pdfProgress || "Citesc documentele local…"}<Button variant="outline" size="sm" className="ml-3" onClick={() => { pdfAbort.current?.abort(); setPdfProgress("Anulare după pagina curentă…"); }}>Anulează</Button></div>}
+        {!!pdfDocuments.length && <PdfImportReview documents={pdfDocuments} form={form} onApply={(changes) => { patch(changes); setResult(null); setLetter(""); }} onClose={() => setPdfDocuments([])} />}
+
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* LEFT: form */}
           <div className="w-full space-y-5 lg:w-[60%]">
@@ -646,6 +608,14 @@ export default function RentCalculator() {
               </div>
               <div className="mt-4">
                 <CuiField label="CUI emitent factură" cuiKey="rep_cui" nameKey="rep_emitent" addrKey="rep_localitate" target="rep" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
+              </div>
+              <div className="mt-4 border-t pt-3">
+                <p className="mb-2 text-sm font-semibold">Totaluri citite din documente (lei)</p>
+                <p className="mb-3 text-xs text-muted-foreground">Se verifică separat față de calculul de mai jos. Completează orele și tariful pentru calcularea manoperei.</p>
+                {toNum(form.rep_total_document) > 0 && Math.abs(toNum(form.rep_total_document) - valFact) > 0.01 && <p className="mb-2 text-sm text-amber-700">Totalul din document diferă de calculul din formular. Verifică piesele, materialele, orele, tariful și TVA-ul.</p>}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[["rep_total_document", "Total factură reparație cu TVA"], ["rep_tin_total_document", "Total manoperă tinichigerie"], ["rep_vops_total_document", "Total manoperă vopsitorie"], ["rep_manopera_total_document", "Total manoperă"]].map(([key, label]) => <Field key={key} label={label} id={key}><Input id={key} inputMode="decimal" value={form[key] || ""} onChange={set(key)} /></Field>)}
+                </div>
               </div>
             </Section>
 
