@@ -1,4 +1,4 @@
-// Extragere text din PDF-uri, 100% in browser (GDPR - datele NU parasesc dispozitivul).
+// Extragere text/OCR locală în browser. Nu transmite conținutul documentelor.
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ""}/pdf.worker.min.mjs`;
@@ -32,11 +32,12 @@ async function getOcrWorker() {
       corePath: `${base}/tesseract/`,
       langPath: `${base}/tessdata`,
       gzip: true,
+      cacheMethod: "none",
     });
     _ocrWorker = worker;
     return worker;
   })();
-  return _ocrLoading;
+  try { return await _ocrLoading; } catch (error) { _ocrLoading = null; throw error; }
 }
 
 export async function terminateOcr() {
@@ -242,4 +243,50 @@ export function classifyHighlights(highlights) {
 // Extrage CUI-urile (2-10 cifre) din marcajele galbene, in ordine.
 export function extractCuisFromHighlights(highlights) {
   return classifyHighlights(highlights).cuis;
+}
+
+// Păstrează liniile, coloanele și pagina sursă; fără transmiterea conținutului.
+export async function readPdfPages(file, { onProgress = () => {}, signal } = {}) {
+  if (file.size > 40 * 1024 * 1024) throw new Error('PDF prea mare (maximum 40 MB). Împarte documentul.');
+  const task = pdfjsLib.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false });
+  const pages = [];
+  try {
+    const pdf = await task.promise;
+    if (pdf.numPages > 150) throw new Error('Maximum 150 de pagini per fișier. Împarte documentul.');
+    for (let i = 1; i <= pdf.numPages; i++) {
+      if (signal?.aborted) throw new Error('Citire anulată.');
+      onProgress(`Pagina ${i}/${pdf.numPages}`);
+      const page = await pdf.getPage(i), content = await page.getTextContent();
+      const items = content.items.filter(it => it.str?.trim()).map(it => ({ str: it.str, x: it.transform[4], y: it.transform[5], width: it.width || 0 }));
+      items.sort((a, b) => b.y - a.y || a.x - b.x);
+      const rows = [];
+      for (const it of items) {
+        let row = rows.find(r => Math.abs(r.y - it.y) < 3);
+        if (!row) { row = { y: it.y, items: [] }; rows.push(row); }
+        row.items.push(it);
+      }
+      let text = rows.map(row => row.items.sort((a,b)=>a.x-b.x).map((it,j,arr) => (j ? (it.x - arr[j-1].x - arr[j-1].width > 20 ? '\t' : ' ') : '') + it.str).join('')).join('\n');
+      let method = 'Text PDF', warning = '';
+      if (text.replace(/\s/g,'').length < 60) {
+        onProgress(`Pagina ${i}/${pdf.numPages} • OCR local`);
+        try {
+          const worker = await getOcrWorker();
+          const rendered = await renderPage(page, 2);
+          try { text = (await worker.recognize(rendered.canvas)).data.text || ''; method = 'OCR local'; }
+          finally { rendered.canvas.width = 0; rendered.canvas.height = 0; }
+        } catch (_) { warning = 'OCR nereușit pe această pagină; verifică documentul manual.'; }
+      }
+      const highlights = [];
+      // Marcajele sunt disponibile pentru asociere manuală cu un câmp.
+      for (const a of await page.getAnnotations()) {
+        if (a.subtype !== 'Highlight') continue;
+        const b = bboxOf(a);
+        const selected = items.filter(it => it.x + it.width / 2 >= b.xmin - 2 && it.x + it.width / 2 <= b.xmax + 2 && it.y >= b.ymin - 3 && it.y <= b.ymax + 3).map(it=>it.str).join(' ');
+        if (selected) highlights.push(selected);
+      }
+      pages.push({ page: i, text, method, highlights, warning });
+      page.cleanup();
+    }
+    return pages;
+  } finally { await task.destroy(); }
 }
