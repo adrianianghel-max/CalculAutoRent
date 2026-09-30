@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+(async()=>{
+const m=await import('data:text/javascript;base64,'+fs.readFileSync('src/lib/documentExtract.js').toString('base64'));
+const extract=(text,name='document.pdf',type='auto')=>m.extractDocument([{page:1,text}],name,type).candidates;
+const value=(rows,field)=>rows.filter(r=>r.field===field).map(r=>r.value);
+for(const input of ['14.994,00','14,994.00','14994.00','14 994,00'])assert.equal(m.documentNumber(input),'14994');
+assert.equal(m.documentDate('2024-03-08'),'08/03/2024');assert.equal(m.documentDate('31.02.2024'),null);
+const rent=extract('FACTURA nr. RENT-123\nFurnizor: FIRMA TEST SRL\nCUI: RO45190142\nClient: ALTA FIRMA\nCUI: 12345678\nData facturii: 02.07.2024\nServicii inchiriere autoturism\nTotal de plata: 14,994.00 lei\nZile facturate: 30\nPerioada rent: 01.07.2024 - 14.08.2024');
+assert.deepEqual(value(rent,'rent_factura_nr'),['RENT-123']);assert.deepEqual(value(rent,'rent_cui'),['45190142']);assert.deepEqual(value(rent,'valoare_desp_rent_facturata'),['14994']);assert.deepEqual(value(rent,'rent_end'),['14/08/2024']);
+const deviz=extract('DEVIZ\nTotal piese: 100,00\nCALCULAȚIE FINALĂ\nTotal piese: 4.638,02\nCost materiale vopsitorie: 278,67\nTarif orar manopera: 450,00 lei/h\nOre tinichigerie: 26,80\nManopera vopsitorie: 11,70 h\nTotal manopera tinichigerie: 12.060,00 lei\nTotal manopera vopsitorie: 5.265,00\nTVA 21%');
+assert.deepEqual(value(deviz,'piese_facturat'),['4638.02']);assert.deepEqual(value(deviz,'ore_tinichigerie_facturat'),['26.8']);assert.deepEqual(value(deviz,'ore_vopsitorie_facturat'),['11.7']);assert.deepEqual(value(deviz,'rep_tin_total_document'),['12060']);assert.deepEqual(value(deviz,'rep_vops_total_document'),['5265']);assert.deepEqual(value(deviz,'ora_manopera_facturata'),['450']);
+const unclear=extract('FACTURA nr. A-99\nCUI: 45190142\nTotal de plata: 100 lei');assert.equal(unclear.length,0);
+const forced=extract('FACTURA nr. A-99\nCUI: 45190142\nTotal de plata: 100 lei','document.pdf','rep');assert.deepEqual(value(forced,'rep_total_document'),['100']);assert.ok(forced.find(r=>r.field==='rep_cui').note);
+const nc=extract('Proces verbal de constatare\nDosar daune: TEST-123\nNr. Înmatriculare: B 12 ABC\nMarca, tipul: HYUNDAI TUCSON\nProprietar: NUME TEST\nData evenimentului: 2025-11-12\nData avizarii RCA: 30.01.2026');assert.deepEqual(value(nc,'numar_inmatriculare'),['B12ABC']);assert.deepEqual(value(nc,'data_avizare'),['30/01/2026']);assert.deepEqual(value(nc,'marca_model'),['HYUNDAI TUCSON']);
+assert.deepEqual(value(extract('Polita RCA\nDate Given\n20/11/2024'),'data_emitere_rca'),['20/11/2024']);
+assert.throws(()=>m.selectedChanges([{field:'rep_cui',value:'1',selected:true},{field:'rep_cui',value:'2',selected:true}]));
+assert.deepEqual(m.selectedChanges([{field:'rep_cui',value:'45190142',selected:false}]),{});
+assert.ok(!deviz.some(r=>/acceptat/.test(r.field)));
+console.log('OK: facturi, furnizor/client, deviz final, sume RO/US, ore vs lei, date, conflict și aplicare explicită.');
+})();
