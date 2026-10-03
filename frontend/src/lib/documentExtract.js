@@ -2,7 +2,7 @@
 export const PDF_FIELDS = {
   nr_dosar: 'Dosar daune', numar_inmatriculare: 'Număr auto păgubit', marca_model: 'Marca / model păgubit',
   nume_pagubit: 'Nume păgubit', adresa_pagubit: 'Adresă păgubit', data_eveniment: 'Data evenimentului',
-  data_avizare: 'Data avizare / DIR', data_constatare: 'Data constatării', data_emitere_rca: 'Data emitere RCA',
+  data_avizare: 'Data avizare', data_constatare: 'Data constatării', data_emitere_rca: 'Data emitere RCA',
   rep_factura_nr: 'Reparație • serie și număr factură', rep_factura_data: 'Reparație • data facturii',
   rep_cui: 'Reparație • CUI emitent', rep_emitent: 'Reparație • emitent', rep_localitate: 'Reparație • localitate / județ',
   rent_factura_nr: 'Rent • serie și număr factură', rent_factura_data: 'Rent • data facturii',
@@ -17,7 +17,7 @@ export const PDF_FIELDS = {
   rep_vops_total_document: 'Document • total manoperă vopsitorie (lei)', rep_manopera_total_document: 'Document • total manoperă (lei)',
   cui_cesionar: 'CUI cesionar', nume_cesionar: 'Nume cesionar', adresa_cesionar: 'Adresă cesionar',
 };
-export const DOCUMENT_TYPES = { auto: 'Recunoaștere automată', rep: 'Factură reparație', rent: 'Factură / contract Rent', deviz: 'Deviz / calculație finală', nc: 'Constatare', polita: 'Poliță RCA', unknown: 'Alt document' };
+export const DOCUMENT_TYPES = { auto: 'Recunoaștere automată', rep: 'Factură reparație', rent: 'Factură Rent', contract: 'Contract Rent', comanda: 'Comandă reparație', deviz: 'Deviz / calculație finală', nc: 'Constatare', polita: 'Poliță RCA', unknown: 'Alt document' };
 const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const DATE = '(?:\\d{4}-\\d{2}-\\d{2}|\\d{2}[./]\\d{2}[./]\\d{4})';
 const NUM = '-?(?:\\d{1,3}(?:[ .,]\\d{3})+|\\d+)(?:[.,]\\d{1,2})?';
@@ -61,7 +61,7 @@ export function detectDocument(text, name = '') {
   if (/repar|cdrep/.test(fn)) return 'rep';
   return 'unknown';
 }
-export function extractDocument(pages, name, forcedType = 'auto') {
+function extractRawDocument(pages, name, forcedType = 'auto') {
   const candidates = [], pageTypes = [];
   const add = (field, value, page, evidence, note = '') => {
     if (value === null || value === undefined || String(value).trim() === '') return;
@@ -143,6 +143,7 @@ export function selectedChanges(rows) {
   const result = {};
   for (const r of rows.filter(r => r.selected)) {
     if (!PDF_FIELDS[r.field] || !String(r.value).trim()) throw new Error('Alege câmpul și valoarea pentru fiecare rând bifat.');
+    if (r.allowedFields && !r.allowedFields.includes(r.field)) throw new Error('Câmpul nu aparține sursei autorizate.');
     let value = r.value.trim();
     if (/^(?:piese_facturat|materiale_facturat|ora_manopera_facturata|ore_tinichigerie_facturat|ore_vopsitorie_facturat|tva_percent|zile_facturate|valoare_desp_rent_facturata|rep_.*_document)$/.test(r.field)) {
       value = documentNumber(value);
@@ -155,6 +156,153 @@ export function selectedChanges(rows) {
     }
     if (r.field in result && result[r.field] !== value) throw new Error('Ai bifat valori diferite pentru același câmp. Păstrează o singură variantă.');
     result[r.field] = value;
+    if (r.field === 'data_avizare' || r.field === 'data_constatare') {
+      for (const paired of ['data_avizare','data_constatare']) {
+        if (paired in result && result[paired] !== value) throw new Error('Avizarea și constatarea trebuie să aibă aceeași dată din nc.pdf.');
+        result[paired] = value;
+      }
+    }
   }
   return result;
+}
+
+// Sursele autoritare sunt stabilite de utilizator, independent de textul repetat.
+export function isNcFile(name) { return /^nc(?:\s*\(\d+\))?\.pdf$/i.test(String(name).trim()); }
+export function isPolicyFile(name) { return /^cst_nl_info_polita_2019_v2(?:\s*\(\d+\))?\.pdf$/i.test(String(name).trim()); }
+const NC_FIELDS = ['nr_dosar','numar_inmatriculare','marca_model','nume_pagubit','data_eveniment','data_avizare','data_constatare','cui_cesionar','nume_cesionar','adresa_cesionar'];
+const DEVIZ_FIELDS = ['piese_facturat','materiale_facturat','ora_manopera_facturata','ore_tinichigerie_facturat','ore_vopsitorie_facturat','rep_tin_total_document','rep_vops_total_document','rep_manopera_total_document','tva_percent'];
+const RENT_CONTRACT_FIELDS = ['zile_facturate','auto_inchiriat_marca','rent_start','rent_end'];
+const ORDER_FIELDS = ['rep_start','rep_end'];
+function hasInvoiceHeading(text) {
+  return /(?:^|\n)\s*(?:factura(?:\s+fiscala)?|invoice)(?:\s*(?:nr\.?|numar|seria|no\.?|#|:)|\s*$|\s+[a-z0-9/-]+\s*$)/im.test(norm(text));
+}
+function sourceType(page, name, forcedType, allPages) {
+  if (isNcFile(name)) return 'nc';
+  if (isPolicyFile(name)) return 'polita';
+  const n = norm(page.text), fn = norm(name);
+  if (hasInvoiceHeading(page.text)) {
+    if (forcedType === 'rep' || forcedType === 'rent') return forcedType;
+    const description = n.split(/denumirea?\s+(?:produs|servic)|descriere\s+(?:produs|servic)/).slice(1).join(' ') || n;
+    const rent = /inchiriere|lipsa de folosinta/.test(description);
+    const repair = /manopera|tinichigerie|vopsitorie|reparati[ei]/.test(description);
+    if (rent && !repair) return 'rent';
+    if (repair && !rent) return 'rep';
+    if (/factura.*rent|cdrent/.test(fn) && !repair) return 'rent';
+    if (/factura.*repar|cdrep/.test(fn) && !rent) return 'rep';
+    return 'unknown';
+  }
+  if (/contract(?:ul)?[^\n]{0,60}(?:inchiriere|rent)/.test(n) || forcedType === 'contract' || /contract.*(?:rent|inchiriere)/.test(fn)) return 'contract';
+  if (/comanda(?:\s+(?:de|ferma))?\s+reparati[ei]/.test(n) || forcedType === 'comanda' || /comanda.*repar/.test(fn)) return 'comanda';
+  if (forcedType === 'deviz' || /deviz|calculatie/.test(fn) || allPages.some(p=>/calculatie\s+finala|\bdeviz\b/.test(norm(p.text)))) return 'deviz';
+  return 'unknown';
+}
+function makeCandidate(field,value,page,name,evidence,note='',allowedFields=[field]) {
+  return {field,value:String(value),page:page.page,source:name,evidence:evidence.slice(0,240),note,allowedFields};
+}
+export function policyGivenDate(page) {
+  const items=page.textItems || [], labels=[];
+  for(const item of items) {
+    if (/^date\s+given$/i.test(item.str.trim())) labels.push(item);
+    else if (/^date$/i.test(item.str.trim())) {
+      const given=items.find(it=>/^given$/i.test(it.str.trim()) && Math.abs(it.y-item.y)<3 && it.x>item.x && it.x-item.x<70);
+      if(given)labels.push({...item,width:given.x+given.width-item.x});
+    }
+  }
+  for(const label of labels) {
+    const right=items.filter(it=>Math.abs(it.y-label.y)<3 && it.x>label.x+label.width+3).sort((a,b)=>a.x-b.x)[0]?.x ?? label.x+100;
+    const below=items.filter(it=>it.y<label.y-2 && label.y-it.y<80 && it.x>=label.x-4 && it.x<right-2 && documentDate(it.str.trim())).sort((a,b)=>b.y-a.y);
+    if(below.length)return documentDate(below[0].str.trim());
+  }
+  // Acceptă forma simplă, dar nu traversează alte antete de tabel.
+  const direct=page.text.match(new RegExp('Date\\s+Given\\s*:?\\s*(' + DATE + ')','i'));
+  return direct ? documentDate(direct[1]) : null;
+}
+function personKey(value) {
+  return norm(value).replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');
+}
+export function ncIdentity(documents) {
+  const names=documents.filter(d=>isNcFile(d.name)).flatMap(d=>extractRawDocument(d.pages,d.name,'nc').candidates.filter(c=>c.field==='nume_pagubit').map(c=>c.value));
+  const unique=[...new Map(names.map(n=>[personKey(n),n])).values()];
+  return unique.length===1 ? unique[0] : '';
+}
+function addressCandidates(page,name,identity) {
+  if(!identity)return [];
+  const required=personKey(identity).split(' ').filter(Boolean);
+  if(required.length<2)return [];
+  const matchesName=s=>{const tokens=new Set(personKey(s).split(' '));return required.every(t=>tokens.has(t));};
+  const lines=page.text.split(/\n/).map(l=>l.trim()).filter(Boolean), blocks=[];
+  // Facturile cu două coloane: extrage separat fiecare parte, păstrând coordonatele.
+  const items=page.textItems || [];
+  const partyHeaders=items.filter(it=>/^(furnizor|client|cumparator|beneficiar|emitent)\s*:?$/i.test(norm(it.str).trim())).sort((a,b)=>a.x-b.x);
+  const paired=partyHeaders.length>=2 && Math.abs(partyHeaders[0].y-partyHeaders[1].y)<8;
+  if(!paired && lines.some(line=>/furnizor|emitent/.test(norm(line)) && /client|cumparator|beneficiar/.test(norm(line))))return [];
+  if(paired) {
+    for(let h=0;h<partyHeaders.length;h++) {
+      const header=partyHeaders[h],right=partyHeaders[h+1]?.x ?? Infinity;
+      const part=items.filter(it=>it.x>=header.x-4 && it.x<right-4 && it.y<=header.y+3 && header.y-it.y<180).sort((a,b)=>Math.abs(a.y-b.y)>3?b.y-a.y:a.x-b.x);
+      blocks.push(part.map(it=>it.str).join('\n'));
+    }
+  } else {
+    let current=[];
+    for(const line of lines) {
+      if(/^(?:furnizor|client|cumparator|beneficiar|emitent)\b/.test(norm(line)) && current.length){blocks.push(current.join('\n'));current=[];}
+      current.push(line);
+    }
+    if(current.length)blocks.push(current.join('\n'));
+  }
+  const out=[];
+  for(const block of blocks) {
+    if(!matchesName(block))continue;
+    // Pentru CI/BI, numele/prenumele trebuie să fie în același bloc cu domiciliul.
+    const bLines=block.split('\n');
+    for(let i=0;i<bLines.length;i++) {
+      if(!/\b(?:domiciliu|adresa|sediu)\b/.test(norm(bLines[i])))continue;
+      if(!matchesName(bLines.slice(Math.max(0,i-10),i+2).join(' ')))continue;
+      const values=[];
+      let first=bLines[i].replace(/^.*?(?:domiciliu(?:l)?|adres[ăa]|sediu(?:l)?)\s*(?:\/[^:]+)?\s*:?\s*/i,'').trim();
+      if(first && !/^(address|adresse)$/i.test(first))values.push(first);
+      for(let j=i+1;j<Math.min(bLines.length,i+4);j++) {
+        if(/^(?:cnp|cui|cif|cod fiscal|iban|cont|banca|sex|cetaten|valabil|emisa|emis|seria|nr\.?|furnizor|client|cumparator|beneficiar|nume|prenume|data)\b/.test(norm(bLines[j])))break;
+        if(/jud|str\.?|strada|municip|mun\.?|oras|sat\b|com\.?|sector|nr\.?|bloc|bl\.?|scara|sc\.?|et\.?|ap\.?/i.test(bLines[j]) || !values.length)values.push(bLines[j]);else break;
+      }
+      const value=values.join(', ');
+      if(value && !/\b\d{13}\b/.test(value))out.push(makeCandidate('adresa_pagubit',value,page,name,`${identity}\n${value}`,'Numele din nc.pdf se regăsește în blocul de adresă. Confirmă domiciliul/sediul.'));
+    }
+  }
+  return out;
+}
+export function extractDocument(pages,name,forcedType='auto',context={}) {
+  const candidates=[],pageTypes=[],identity=ncIdentity(context.documents || [{name,pages}]);
+  for(let i=0;i<pages.length;i++) {
+    const page=pages[i],type=sourceType(page,name,forcedType,pages);pageTypes.push(type);
+    let allowed=[];
+    if(type==='nc')allowed=NC_FIELDS;
+    if(type==='polita')allowed=['data_emitere_rca'];
+    if(type==='deviz' && i===pages.length-1)allowed=DEVIZ_FIELDS;
+    if(type==='contract')allowed=RENT_CONTRACT_FIELDS;
+    if(type==='comanda')allowed=ORDER_FIELDS;
+    if(type==='rep' || type==='rent')allowed=[`${type}_factura_nr`,`${type}_factura_data`,`${type}_cui`,`${type}_emitent`,`${type}_localitate`,type==='rent'?'valoare_desp_rent_facturata':'rep_total_document'];
+    const raw=extractRawDocument([page],name,type==='contract'?'rent':type==='comanda'?'rep':type).candidates;
+    for(const candidate of raw) {
+      if(!allowed.includes(candidate.field) || candidate.field==='data_emitere_rca' || candidate.field==='data_avizare')continue;
+      candidates.push({...candidate,allowedFields:allowed});
+      if(candidate.field==='data_constatare')candidates.push({...candidate,field:'data_avizare',note:'Aceeași dată a constatării din nc.pdf.',allowedFields:allowed});
+    }
+    if(type==='polita') {
+      const value=policyGivenDate(page);
+      if(value)candidates.push(makeCandidate('data_emitere_rca',value,page,name,`Date Given: ${value}`));
+    }
+    if(type==='contract' || type==='comanda') {
+      const prefix=type==='contract'?'rent':'rep';
+      const labels=type==='contract' ? {start:'data\\s+(?:inceput|preluarii|predarii)|de\\s+la',end:'data\\s+(?:sfarsit|returnarii|restituirii)|pana\\s+la'} : {start:'data\\s+(?:intrarii|intrare|inceput)(?:\\s+(?:in\\s+service|reparatie))?',end:'data\\s+(?:iesirii|iesire|finalizarii|sfarsit)(?:\\s+(?:din\\s+service|reparatie))?'};
+      for(const [part,label] of Object.entries(labels)) {
+        const re=new RegExp('(?:'+label+')\\s*:?\\s*('+DATE+')','gi');
+        for(const match of norm(page.text).matchAll(re)){const value=documentDate(match[1]);if(value)candidates.push(makeCandidate(prefix+'_'+part,value,page,name,match[0],'',allowed));}
+      }
+    }
+    // Adressele sunt singura excepție: pot proveni din alte acte, cu identitate verificată.
+    candidates.push(...addressCandidates(page,name,identity));
+  }
+  const unique=candidates.filter((c,i,arr)=>arr.findIndex(x=>x.field===c.field && x.value===c.value && x.page===c.page)===i);
+  return {candidates:unique,pageTypes};
 }
