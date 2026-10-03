@@ -284,7 +284,7 @@ export async function readPdfPages(file, { onProgress = () => {}, signal } = {})
         const selected = items.filter(it => it.x + it.width / 2 >= b.xmin - 2 && it.x + it.width / 2 <= b.xmax + 2 && it.y >= b.ymin - 3 && it.y <= b.ymax + 3).map(it=>it.str).join(' ');
         if (selected) highlights.push(selected);
       }
-      pages.push({ page: i, text, method, highlights, warning });
+      pages.push({ page: i, text, textItems: method === "Text PDF" ? items : [], method, highlights, warning });
       page.cleanup();
     }
     return pages;
