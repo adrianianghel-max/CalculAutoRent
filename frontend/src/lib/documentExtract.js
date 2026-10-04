@@ -364,3 +364,21 @@ export function automaticPdfChanges(documents) {
   }
   return {changes:selectedChanges(selected),unresolved:[...new Set(unresolved)]};
 }
+
+// Public source gate shared by the local learning engine. Learned rules cannot cross these boundaries.
+export function learningPages(documents, field) {
+  const result=[];
+  for (let di=0;di<documents.length;di++) {
+    const doc=documents[di], types=doc.pages.map(p=>sourceType(p,doc.name,'auto',doc.pages));
+    const summaries=doc.pages.map((p,i)=>types[i]==='deviz' && (/calculati[ae]\s+finala|recapitulati[ae]|sumar\s+calcul/.test(norm(p.text)) || extractRawDocument([p],doc.name,'deviz').candidates.some(c=>DEVIZ_FIELDS.slice(0,5).includes(c.field))) ? i : -1).filter(i=>i>=0);
+    const last=summaries.length?summaries[summaries.length-1]:doc.pages.length-1;
+    for(let pi=0;pi<doc.pages.length;pi++) {
+      const type=types[pi];
+      const allowed=(type==='nc' && NC_FIELDS.includes(field)) || (type==='polita' && field==='data_emitere_rca') || (type==='deviz' && pi===last && DEVIZ_FIELDS.includes(field)) || (type==='contract' && RENT_CONTRACT_FIELDS.includes(field)) || (type==='comanda' && ORDER_FIELDS.includes(field)) || ((type==='rep'||type==='rent') && [`${type}_factura_nr`,`${type}_factura_data`,`${type}_cui`,`${type}_emitent`,`${type}_localitate`,type==='rent'?'valoare_desp_rent_facturata':'rep_total_document'].includes(field));
+      // Address learning requires the existing identity-matching extractor to confirm the address.
+      const addresses=field==='adresa_pagubit'?addressCandidates(doc.pages[pi],doc.name,ncIdentity(documents)).map(c=>c.value):[];
+      if(allowed || addresses.length)result.push({page:doc.pages[pi],type:field==='adresa_pagubit'?'identity-address':type,di,pi,addresses});
+    }
+  }
+  return result;
+}
