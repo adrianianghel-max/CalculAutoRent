@@ -52,8 +52,9 @@ import { periodDays } from "@/lib/rentTable";
 import { exportExcel } from "@/lib/exportExcel";
 import { readPdfPages, terminateOcr } from "@/lib/pdfExtract";
 import { automaticPdfChanges, PDF_FIELDS } from "@/lib/documentExtract";
+import { loadLearningRules, saveLearningRules, learnSection, applyLearningRules, forgetSection } from "@/lib/pdfLearning";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL || ""}/api`;
 
 const TYPE_STYLES = {
   avizare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
@@ -149,7 +150,7 @@ function Field({ label, id, children, hint, className }) {
   );
 }
 
-function Section({ icon: Icon, title, children, action, tone }) {
+function Section({ icon: Icon, title, children, action, feedback, tone }) {
   const background = tone === "repair"
     ? "bg-green-50 dark:bg-green-950/30"
     : tone === "rent"
@@ -172,6 +173,7 @@ function Section({ icon: Icon, title, children, action, tone }) {
         </div>
         {action}
       </div>
+      {feedback && <div className="border-b px-4 py-2 text-xs text-muted-foreground" role="status">{feedback}</div>}
       <div className="p-4">{children}</div>
     </motion.section>
   );
@@ -230,7 +232,7 @@ function CuiField({ label, cuiKey, nameKey, addrKey, target, form, patch, lookup
         <Field label={label} id={cuiKey} className="flex-1">
           <Input id={cuiKey} value={form[cuiKey] ?? ""} onChange={(e) => patch({ [cuiKey]: e.target.value.toUpperCase() })} data-testid={`${cuiKey.replace(/_/g, "-")}-input`} />
         </Field>
-        <Button type="button" variant="outline" className="h-9 gap-1.5" onClick={() => lookupCui(form[cuiKey], target)} disabled={cuiLoading === target} data-testid={`lookup-${target}-cui-button`}>
+        <Button type="button" variant="outline" className="h-9 gap-1.5" onClick={() => lookupCui(form[cuiKey], target)} disabled={Boolean(cuiLoading)} data-testid={`lookup-${target}-cui-button`}>
           <Search className="h-3.5 w-3.5" />
           {cuiLoading === target ? "..." : "ANAF"}
         </Button>
@@ -256,6 +258,13 @@ export default function RentCalculator() {
   const [parsing, setParsing] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
   const pdfAbort = useRef(null);
+  const pdfSession = useRef({ documents: [], baseline: {} });
+  const formRef = useRef(form);
+  formRef.current = form;
+  const cuiRequest = useRef(null);
+  const [learningRules, setLearningRules] = useState(() => loadLearningRules());
+  const [learningFeedback, setLearningFeedback] = useState({});
+  useEffect(() => () => { pdfAbort.current?.abort(); cuiRequest.current?.abort(); pdfSession.current = { documents: [], baseline: {} }; }, []);
   const [exporting, setExporting] = useState(false);
   const fileRef = useRef(null);
 
@@ -280,7 +289,8 @@ export default function RentCalculator() {
   }, [dark]);
 
   const patch = (changes) => {
-    const next = { ...form, ...changes };
+    const next = { ...formRef.current, ...changes };
+    formRef.current = next;
     setForm(next);
     saveForm(next);
   };
@@ -332,6 +342,8 @@ export default function RentCalculator() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setParsing(true);
+    pdfSession.current = { documents: [], baseline: {} };
+    setLearningFeedback({});
     const controller = new AbortController();
     pdfAbort.current = controller;
     const documents = [];
@@ -349,12 +361,19 @@ export default function RentCalculator() {
         }
       }
       if (!controller.signal.aborted) {
-        const { changes, unresolved } = automaticPdfChanges(documents);
+        const standard = automaticPdfChanges(documents);
+        const learned = applyLearningRules(documents, loadLearningRules());
+        const changes = { ...standard.changes, ...learned.changes };
+        for (const field of learned.unresolved) delete changes[field];
+        const unresolved = [...new Set([...standard.unresolved.filter(f => !(f in learned.changes)), ...learned.unresolved])];
+        const next = { ...formRef.current, ...changes };
+        formRef.current = next;
+        pdfSession.current = { documents, baseline: { ...next } };
         if (Object.keys(changes).length) {
-          setForm(previous => ({ ...previous, ...changes }));
+          setForm(next);
           setResult(null);
           setLetter("");
-          toast.success(`${Object.keys(changes).length} câmpuri completate direct din PDF.`);
+          toast.success(`${Object.keys(changes).length} câmpuri completate direct din PDF${Object.keys(learned.changes).length ? `, dintre care ${Object.keys(learned.changes).length} prin regulile învățate` : ""}.`);
         } else toast.info("Nu am găsit date certe de completat în documentele selectate.");
         if (unresolved.length) toast.warning(`Verifică manual: ${unresolved.map(k => PDF_FIELDS[k] || k).join(", ")}. Date neclare sau contradictorii.`, { duration: 10000 });
       }
@@ -367,13 +386,50 @@ export default function RentCalculator() {
     }
   };
 
+  // Learned templates persist locally; source documents and manual examples stay in memory only.
+  const learn = (section) => {
+    if (!pdfSession.current.documents.length) return toast.info("Selectează întâi PDF-urile cu «Culege date PDF», apoi corectează câmpurile și apasă Învățare.");
+    const outcome = learnSection(section, formRef.current, pdfSession.current.baseline, pdfSession.current.documents, learningRules);
+    try {
+      if (outcome.learned.length) {
+        const saved = saveLearningRules(outcome.rules);
+        setLearningRules(saved);
+        for (const item of outcome.learned) pdfSession.current.baseline[item.field] = formRef.current[item.field];
+      }
+    } catch { return toast.error("Browserul nu permite salvarea regulilor. Nu am salvat învățarea; verifică setările de stocare."); }
+    const lines = outcome.learned.map(item => `${PDF_FIELDS[item.field]}: regulă învățată din ${item.source}, pagina ${item.page}.`);
+    lines.push(...outcome.skipped.map(item => `${PDF_FIELDS[item.field]}: ${item.reason}; nu am memorat o regulă.`));
+    setLearningFeedback(previous => ({ ...previous, [section]: lines.length ? lines.join(" ") : "Nu există completări sau corecții noi în câmpurile care se extrag din documente. Valorile acceptate și calculate nu se învață." }));
+    if (outcome.learned.length) toast.success(`${outcome.learned.length} reguli salvate în acest browser.`);
+    else toast.info("Nu am putut învăța o regulă nouă. Vezi explicația din secțiune.");
+  };
+  const forgetLearning = (section) => {
+    try {
+      const saved = saveLearningRules(forgetSection(learningRules, section));
+      setLearningRules(saved);
+      setLearningFeedback(previous => ({ ...previous, [section]: "Regulile acestei secțiuni au fost șterse." }));
+    } catch { toast.error("Nu am putut șterge regulile din browser."); }
+  };
+  const learningAction = (section) => {
+    const count = learningRules.filter(rule => rule.section === section).length;
+    return <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+      <Button type="button" variant="outline" size="sm" disabled={parsing} onClick={() => learn(section)} data-testid={`learn-${section}`} title="Învață din completările și corecțiile făcute după ultimul import PDF">Învățare{count > 0 ? ` (${count})` : ""}</Button>
+      {count > 0 && <Button type="button" variant="ghost" size="sm" disabled={parsing} onClick={() => forgetLearning(section)} aria-label="Șterge regulile de învățare ale secțiunii" title="Șterge regulile acestei secțiuni" className="text-xs">Șterge reguli</Button>}
+    </div>;
+  };
+
   // ---------- Cautare CUI la ANAF ----------
   const lookupCui = async (cuiValue, target) => {
-    const cui = String(cuiValue || "").trim();
-    if (!cui) return toast.error("Introduceti un CUI.");
+    if (cuiLoading) return;
+    const cui = String(cuiValue || "").trim().replace(/^RO\s*/i, "");
+    if (!/^[1-9]\d{1,9}$/.test(cui)) return toast.error("Introdu un CUI de 2–10 cifre, opțional precedat de RO.");
+    const controller = new AbortController();
+    cuiRequest.current = controller;
     setCuiLoading(target);
     try {
-      const r = await axios.post(`${API}/cui-lookup`, { cui });
+      const r = await axios.post(`${API}/cui-lookup`, { cui }, { timeout: 20000, signal: controller.signal });
+      const cuiKey = target === "cesionar" ? "cui_cesionar" : `${target}_cui`;
+      if (String(formRef.current[cuiKey] || "").trim().replace(/^RO\s*/i, "") !== cui) return toast.info("CUI-ul s-a schimbat în timpul căutării. Apasă din nou ANAF.");
       const { denumire, adresa, judet, localitate } = r.data;
       if (target === "cesionar") {
         patch({ nume_cesionar: denumire, adresa_cesionar: adresa || `${localitate}, ${judet}` });
@@ -384,9 +440,11 @@ export default function RentCalculator() {
       }
       toast.success(`ANAF: ${denumire}`);
     } catch (e) {
-      const msg = e.response?.data?.detail || "Eroare la cautarea CUI.";
+      if (controller.signal.aborted) return;
+      const msg = e.response?.data?.detail || "Nu am putut contacta ANAF. Încearcă din nou; datele completate au rămas în formular.";
       toast.error(msg);
     } finally {
+      cuiRequest.current = null;
       setCuiLoading("");
     }
   };
@@ -445,7 +503,12 @@ export default function RentCalculator() {
 
   const resetForm = () => {
     pdfAbort.current?.abort();
+    pdfAbort.current?.abort();
+    cuiRequest.current?.abort();
+    pdfSession.current = { documents: [], baseline: {} };
+    setLearningFeedback({});
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
+    formRef.current = empty;
     setForm(empty);
     saveForm(empty);
     setResult(null);
@@ -454,7 +517,12 @@ export default function RentCalculator() {
   };
 
   const clearForm = () => {
+    pdfAbort.current?.abort();
+    cuiRequest.current?.abort();
+    pdfSession.current = { documents: [], baseline: {} };
+    setLearningFeedback({});
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
+    formRef.current = empty;
     setForm(empty);
     saveForm(empty);
     setResult(null);
@@ -553,8 +621,8 @@ export default function RentCalculator() {
       </header>
 
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+        <p className="mb-4 text-xs text-muted-foreground">Învățare: importă PDF-urile, corectează sau completează câmpurile, apoi apasă butonul secțiunii. Regulile se păstrează doar în acest browser; documentele și valorile personale nu sunt salvate ca exemple. Căutarea ANAF trimite doar CUI-ul firmei și data interogării.</p>
         {parsing && <div role="status" className="mb-4 rounded-lg border p-3 text-sm">{pdfProgress || "Citesc documentele local…"}<Button variant="outline" size="sm" className="ml-3" onClick={() => { pdfAbort.current?.abort(); setPdfProgress("Anulare după pagina curentă…"); }}>Anulează</Button></div>}
-
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* LEFT: form */}
           <div className="w-full space-y-5 lg:w-[60%]">
@@ -564,7 +632,7 @@ export default function RentCalculator() {
               <Input id="nr_dosar" value={form.nr_dosar} onChange={setUpper("nr_dosar")} className="font-mono-num sm:max-w-xs" data-testid="nr-dosar-input" />
             </div>
 
-            <Section icon={User} title="Date Păgubit">
+            <Section icon={User} title="Date Păgubit" action={learningAction("pagubit")} feedback={learningFeedback.pagubit}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Marca / Model" id="marca_model">
                   <Input id="marca_model" value={form.marca_model} onChange={setUpper("marca_model")} data-testid="marca-model-input" />
@@ -601,7 +669,7 @@ export default function RentCalculator() {
               <CuiField label="CUI cesionar" cuiKey="cui_cesionar" nameKey="nume_cesionar" addrKey="adresa_cesionar" target="cesionar" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
             </Section>
 
-            <Section icon={Receipt} title="Date Factură Reparație" tone="repair">
+            <Section icon={Receipt} title="Date Factură Reparație" action={learningAction("factura")} feedback={learningFeedback.factura} tone="repair">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Număr factură" id="rep_factura_nr">
                   <Input id="rep_factura_nr" value={form.rep_factura_nr} onChange={setUpper("rep_factura_nr")} data-testid="rep-factura-nr-input" />
@@ -615,7 +683,7 @@ export default function RentCalculator() {
               </div>
             </Section>
 
-            <Section icon={Wrench} title="Diferențe Despăgubire Reparație" tone="repair">
+            <Section icon={Wrench} title="Diferențe Despăgubire Reparație" action={learningAction("deviz")} feedback={learningFeedback.deviz} tone="repair">
               <div className="mb-2 hidden grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
                 <span className="col-span-4">Element</span>
                 <span className="col-span-4">Facturat</span>
@@ -635,7 +703,7 @@ export default function RentCalculator() {
               <DiffRow label="Valoare despăgubire (auto)" unit="lei" factValue={String(valFact)} accValue={String(valAcc)} readOnly factTestid="valoare-desp-rep-facturata-input" accTestid="valoare-desp-rep-acceptata-input" />
             </Section>
 
-            <Section icon={Car} title="Date Factură Lipsă de Folosință (Rent)" tone="rent">
+            <Section icon={Car} title="Date Factură Lipsă de Folosință (Rent)" action={learningAction("rent")} feedback={learningFeedback.rent} tone="rent">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Număr factură" id="rent_factura_nr">
                   <Input id="rent_factura_nr" value={form.rent_factura_nr} onChange={setUpper("rent_factura_nr")} data-testid="rent-factura-nr-input" />
