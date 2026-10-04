@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
+import defaultHolidays from "@/lib/holidays.json";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -54,7 +55,8 @@ import { readPdfPages, terminateOcr } from "@/lib/pdfExtract";
 import { automaticPdfChanges, PDF_FIELDS } from "@/lib/documentExtract";
 import { loadLearningRules, saveLearningRules, learnSection, applyLearningRules, forgetSection } from "@/lib/pdfLearning";
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ""}/api`;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+const API = `${BACKEND_URL}/api`;
 
 const TYPE_STYLES = {
   avizare: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
@@ -271,12 +273,23 @@ export default function RentCalculator() {
   useEffect(() => {
     const local = loadHolidays(null);
     if (local) {
-      setHolidays(local);
+      let updated = local;
+      try {
+        if (localStorage.getItem("rca_holidays_2027_v1") !== "done") {
+          const dates = new Set(local.map(h => h.date));
+          updated = [...local, ...defaultHolidays.filter(h => h.date.startsWith("2027-") && !dates.has(h.date))].sort((a, b) => a.date.localeCompare(b.date));
+          saveHolidays(updated);
+          localStorage.setItem("rca_holidays_2027_v1", "done");
+        }
+      } catch { /* browser storage unavailable */ }
+      setHolidays(updated);
+    } else if (!BACKEND_URL) {
+      setHolidays(defaultHolidays);
     } else {
       axios
         .get(`${API}/holidays`)
         .then((r) => setHolidays(r.data))
-        .catch(() => setHolidays([]));
+        .catch(() => setHolidays(defaultHolidays));
     }
   }, []);
 
@@ -296,6 +309,19 @@ export default function RentCalculator() {
   };
 
   const set = (key) => (e) => patch({ [key]: e.target.value });
+
+  const enterNextField = (event) => {
+    if (event.key !== "Enter" || event.defaultPrevented || event.nativeEvent.isComposing || event.ctrlKey || event.altKey || event.metaKey) return;
+    const target = event.target;
+    if (target.tagName !== "INPUT" || target.readOnly || ["button", "submit", "checkbox", "radio", "file"].includes(target.type)) return;
+    if (target.closest('[role="dialog"], [role="listbox"]')) return;
+    const fields = Array.from(event.currentTarget.querySelectorAll('input:not([type="hidden"]):not([type="file"]), select, button[role="combobox"], textarea')).filter(el => !el.disabled && !el.readOnly && el.tabIndex >= 0 && el.getClientRects().length > 0);
+    const index = fields.indexOf(target);
+    if (index < 0) return;
+    event.preventDefault();
+    fields[index + (event.shiftKey ? -1 : 1)]?.focus();
+  };
+
 
   // ---------- perioade de culpa dinamice ----------
   const culpaTypeName = (type) =>
@@ -612,7 +638,7 @@ export default function RentCalculator() {
               <Upload className="h-4 w-4" />
               {parsing ? "Se citește..." : "Culege Date PDF"}
             </Button>
-            <HolidayManager holidays={holidays} setHolidays={setHolidays} defaults={holidays} />
+            <HolidayManager holidays={holidays} setHolidays={setHolidays} defaults={defaultHolidays} />
             <Button variant="outline" size="icon" onClick={() => setDark((d) => !d)} data-testid="theme-toggle-button" aria-label="Comuta tema">
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -625,7 +651,7 @@ export default function RentCalculator() {
         {parsing && <div role="status" className="mb-4 rounded-lg border p-3 text-sm">{pdfProgress || "Citesc documentele local…"}<Button variant="outline" size="sm" className="ml-3" onClick={() => { pdfAbort.current?.abort(); setPdfProgress("Anulare după pagina curentă…"); }}>Anulează</Button></div>}
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* LEFT: form */}
-          <div className="w-full space-y-5 lg:w-[60%]">
+          <div className="w-full space-y-5 lg:w-[60%]" onKeyDown={enterNextField}>
             {/* Numar dosar banner */}
             <div className="flex flex-col gap-2 rounded-xl border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
               <Label htmlFor="nr_dosar" className="font-display text-sm font-semibold">Număr dosar</Label>
