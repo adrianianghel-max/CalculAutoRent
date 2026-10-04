@@ -26,6 +26,15 @@ assert.deepEqual(value(extract(idText,'ci.pdf','auto',context),'adresa_pagubit')
 const party='FACTURA nr. T-1\nServicii reparatie\nFurnizor: FIRMA ALTA SRL\nAdresa: STR GRESITA 1\nClient: POPESCU ION\nAdresa: STR CORECTA 2';assert.deepEqual(value(extract(party,'factura.pdf','auto',context),'adresa_pagubit'),['STR CORECTA 2']);
 assert.throws(()=>m.selectedChanges([{field:'rep_cui',allowedFields:['rent_cui'],value:'123',selected:true}]));assert.deepEqual(m.selectedChanges([{field:'data_constatare',value:'02/02/2026',selected:true}]),{data_constatare:'02/02/2026',data_avizare:'02/02/2026'});
 assert.throws(()=>m.selectedChanges([{field:'rep_cui',value:'1',selected:true},{field:'rep_cui',value:'2',selected:true}]));
+const ncModel={name:'nc.pdf',pages:[page('Proprietar: POPESCU ION\nMarca, tipul și varianta: HYUNDAI TUCSON (TL)\nData constatării: 02.02.2026')]};
+assert.equal(m.automaticPdfChanges([ncModel]).changes.marca_model,'HYUNDAI TUCSON');
+assert.equal(m.automaticPdfChanges([{name:'nc.pdf',pages:[page('Marca / Model\nFIAT 500')]}]).changes.marca_model,'FIAT 500');
+const splitDeviz={name:'deviz.pdf',pages:[page('CALCULATIE FINALA\nTotal piese\n4.638,02\nCost materiale vopsitorie\n278,67\nTarif orar manopera:\n450,00 lei/h\nOre tinichigerie\n26,80\nManopera vopsitorie:\n11,70 h'),page('Anexa: semnătura',2)]};
+const auto=m.automaticPdfChanges([ncModel,splitDeviz,{name:'factura.pdf',pages:[page(rentText)]}]);
+assert.equal(auto.changes.piese_facturat,'4638.02');assert.equal(auto.changes.ora_manopera_facturata,'450');assert.equal(auto.changes.ore_vopsitorie_facturat,'11.7');assert.equal(auto.changes.rent_factura_nr,'RENT-123');
+assert.equal(auto.changes.nr_dosar,undefined); // Datele repetate din factură nu intră în Date Păgubit.
+const conflict=m.automaticPdfChanges([{name:'factura1.pdf',pages:[page(rentText)]},{name:'factura2.pdf',pages:[page(rentText.replace('14,994.00','12,000.00'))]}]);assert.equal(conflict.changes.valoare_desp_rent_facturata,undefined);assert.ok(conflict.unresolved.includes('valoare_desp_rent_facturata'));
+assert.deepEqual(value(extract('ANTET FIRMA FACTURA Nr. REP-1\nServicii reparatie\nTotal de plata: 100 lei'),'rep_factura_nr'),['REP-1']);
 console.log('OK: surse exclusive, poliță pe coloană, nc fără duplicate, deviz ultima pagină, factură/contract/comandă, adresă după identitate, date corelate.');
 if(process.env.PRIVATE_POLICY_FIXTURE){const real=JSON.parse(fs.readFileSync(process.env.PRIVATE_POLICY_FIXTURE));const found=m.extractDocument(real,'cst_nl_info_polita_2019_v2(1).pdf').candidates;assert.deepEqual(value(found,'data_emitere_rca'),['16/03/2026']);assert.equal(found.length,1);console.log('PDF atașat: Date Given extras corect; nicio altă informație personală importată.');}
 })();
