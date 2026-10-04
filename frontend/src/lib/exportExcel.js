@@ -182,7 +182,8 @@ export async function exportExcel(form, holidays) {
   const url = URL.createObjectURL(out);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Fisa dosarului RCA ${form.nr_dosar || "dosar"}.xlsm`;
+  const dosar = String(form.nr_dosar || "DOSAR").replace(/[<>:"/\\|?*\x00-\x1F]/g, "-").trim() || "DOSAR";
+  a.download = `Fisa dosarului RCA cazuri abuz-${dosar} Updatata.xlsm`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
