@@ -51,7 +51,7 @@ import { calculeaza } from "@/lib/rcaCalc";
 import { periodDays } from "@/lib/rentTable";
 import { exportExcel } from "@/lib/exportExcel";
 import { readPdfPages, terminateOcr } from "@/lib/pdfExtract";
-import { PdfImportReview } from "@/components/PdfImportReview";
+import { automaticPdfChanges, PDF_FIELDS } from "@/lib/documentExtract";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -254,7 +254,6 @@ export default function RentCalculator() {
   const [dark, setDark] = useState(false);
   const [cuiLoading, setCuiLoading] = useState("");
   const [parsing, setParsing] = useState(false);
-  const [pdfDocuments, setPdfDocuments] = useState([]);
   const [pdfProgress, setPdfProgress] = useState("");
   const pdfAbort = useRef(null);
   const [exporting, setExporting] = useState(false);
@@ -333,7 +332,6 @@ export default function RentCalculator() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setParsing(true);
-    setPdfDocuments([]);
     const controller = new AbortController();
     pdfAbort.current = controller;
     const documents = [];
@@ -350,7 +348,16 @@ export default function RentCalculator() {
           if (!controller.signal.aborted) toast.error(`Nu am putut citi ${file.name}. ${error.message || "Verifică PDF-ul."}`);
         }
       }
-      if (!controller.signal.aborted) setPdfDocuments(documents);
+      if (!controller.signal.aborted) {
+        const { changes, unresolved } = automaticPdfChanges(documents);
+        if (Object.keys(changes).length) {
+          setForm(previous => ({ ...previous, ...changes }));
+          setResult(null);
+          setLetter("");
+          toast.success(`${Object.keys(changes).length} câmpuri completate direct din PDF.`);
+        } else toast.info("Nu am găsit date certe de completat în documentele selectate.");
+        if (unresolved.length) toast.warning(`Verifică manual: ${unresolved.map(k => PDF_FIELDS[k] || k).join(", ")}. Date neclare sau contradictorii.`, { duration: 10000 });
+      }
     } finally {
       await terminateOcr().catch(() => {});
       pdfAbort.current = null;
@@ -439,7 +446,6 @@ export default function RentCalculator() {
   const resetForm = () => {
     pdfAbort.current?.abort();
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
-    setPdfDocuments([]);
     setForm(empty);
     saveForm(empty);
     setResult(null);
@@ -449,7 +455,6 @@ export default function RentCalculator() {
 
   const clearForm = () => {
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
-    setPdfDocuments([]);
     setForm(empty);
     saveForm(empty);
     setResult(null);
@@ -549,7 +554,6 @@ export default function RentCalculator() {
 
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
         {parsing && <div role="status" className="mb-4 rounded-lg border p-3 text-sm">{pdfProgress || "Citesc documentele local…"}<Button variant="outline" size="sm" className="ml-3" onClick={() => { pdfAbort.current?.abort(); setPdfProgress("Anulare după pagina curentă…"); }}>Anulează</Button></div>}
-        {!!pdfDocuments.length && <PdfImportReview documents={pdfDocuments} form={form} onApply={(changes) => { patch(changes); setResult(null); setLetter(""); }} onClose={() => setPdfDocuments([])} />}
 
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* LEFT: form */}
