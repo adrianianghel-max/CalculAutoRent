@@ -613,14 +613,6 @@ export default function RentCalculator() {
               <div className="mt-4">
                 <CuiField label="CUI emitent factură" cuiKey="rep_cui" nameKey="rep_emitent" addrKey="rep_localitate" target="rep" form={form} patch={patch} lookupCui={lookupCui} cuiLoading={cuiLoading} />
               </div>
-              <div className="mt-4 border-t pt-3">
-                <p className="mb-2 text-sm font-semibold">Totaluri citite din documente (lei)</p>
-                <p className="mb-3 text-xs text-muted-foreground">Se verifică separat față de calculul de mai jos. Completează orele și tariful pentru calcularea manoperei.</p>
-                {toNum(form.rep_total_document) > 0 && Math.abs(toNum(form.rep_total_document) - valFact) > 0.01 && <p className="mb-2 text-sm text-amber-700">Totalul din document diferă de calculul din formular. Verifică piesele, materialele, orele, tariful și TVA-ul.</p>}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {[["rep_total_document", "Total factură reparație cu TVA"], ["rep_tin_total_document", "Total manoperă tinichigerie"], ["rep_vops_total_document", "Total manoperă vopsitorie"], ["rep_manopera_total_document", "Total manoperă"]].map(([key, label]) => <Field key={key} label={label} id={key}><Input id={key} inputMode="decimal" value={form[key] || ""} onChange={set(key)} /></Field>)}
-                </div>
-              </div>
             </Section>
 
             <Section icon={Wrench} title="Diferențe Despăgubire Reparație" tone="repair">
