@@ -80,7 +80,7 @@ function extractRawDocument(pages, name, forcedType = 'auto') {
       const raw = lines[i], n = norm(raw), next = lines[i + 1] || '';
       const joined = raw + '\n' + next;
       const getDate = pattern => { const m = norm(joined).match(new RegExp(pattern + '[^\\d\\n]{0,30}\\s*(' + DATE + ')', 'i')); return m && documentDate(m[1]); };
-      const getNumber = pattern => { const m = n.match(new RegExp(pattern + '\\s*[:=]?\\s*(' + NUM + ')(?![\\d.,])', 'i')); return m && documentNumber(m[1]); };
+      const getNumber = pattern => { const m = norm(joined).match(new RegExp(pattern + '\\s*(?:\\((?:lei|ron|ore|h)\\)|lei|ron)?\\s*[:=]?\\s*(' + NUM + ')(?![\\d.,])', 'i')); return m && documentNumber(m[1]); };
       let m;
       if ((m = n.match(/dosar(?:\s+(?:de\s+)?daun[ae])?\s*(?:nr\.?\s*)?[:#]\s*([a-z0-9/-]+)/i))) add('nr_dosar', m[1].toUpperCase(), page.page, raw);
       if (type === 'nc') {
@@ -99,8 +99,9 @@ function extractRawDocument(pages, name, forcedType = 'auto') {
         const cuiMatches = [...raw.matchAll(/(?:C\.?U\.?I\.?|C\.?I\.?F\.?|cod\s+fiscal)\s*:?\s*(?:RO\s*)?(\d{2,10})\b/gi)];
         if (!buyer) for (const cm of cuiMatches) add(type + '_cui', cm[1], page.page, raw, (!supplier || cuiMatches.length > 1 ? 'Verifică emitentul: CUI posibil al clientului. ' : '') + (!validCui(cm[1]) ? 'Cifra de control CUI nu corespunde; verifică OCR-ul.' : ''));
         if (supplier && (m = raw.match(/(?:localitate|jude[tț](?:ul)?|jud\.)\s*:?\s*([^,\t;]+)/i))) add(type + '_localitate', m[1], page.page, raw);
-        if ((m = raw.match(/factur[ăa](?:\s+fiscal[ăa])?\s*(?:seria\s*)?([A-Z][A-Z0-9-]{0,14})?\s*(?:nr\.?|num[ăa]r(?:ul)?)\s*:?\s*([A-Z0-9/-]+)/i))) add(type + '_factura_nr', [m[1],m[2]].filter(Boolean).join(' '), page.page, raw);
-        if ((m = joined.match(/seria\s*:?\s*([A-Z0-9-]+)\s*(?:nr\.?|num[ăa]r(?:ul)?)\s*:?\s*([A-Z0-9/-]+)/i))) add(type + '_factura_nr', `${m[1]} ${m[2]}`, page.page, raw);
+        if ((m = joined.match(/factur[ăa](?:\s+fiscal[ăa])?\s*(?:seria\s*)?([A-Z][A-Z0-9-]{0,14})?\s*(?:nr\.?|num[ăa]r(?:ul)?)\s*:?\s*([A-Z0-9/-]+)/i))) add(type + '_factura_nr', [m[1],m[2]].filter(Boolean).join(' '), page.page, raw);
+        if ((m = joined.match(/seri[ae]\s*:?\s*([A-Z0-9-]+)\s*(?:nr\.?|num[ăa]r(?:ul)?)\s*:?\s*([A-Z0-9/-]+)/i))) add(type + '_factura_nr', `${m[1]} ${m[2]}`, page.page, raw);
+        if ((m = joined.match(/factur[ăa](?:\s+fiscal[ăa])?\s+([A-Z][A-Z0-9-]{0,12})\s+(\d{1,15})\b/i))) add(type + '_factura_nr', `${m[1]} ${m[2]}`, page.page, joined);
         if (i < 25 && /^data\s*:/i.test(n)) add(type + '_factura_data', getDate('^data'), page.page, joined);
         add(type + '_factura_data', getDate('data\\s+(?:facturii|factura|emiterii|emiter[eii]+)'), page.page, joined);
         const total = getNumber('(?:total\\s+(?:de\\s+plata|general|cu\\s+tva)|valoare\\s+totala(?:\\s+cu\\s+tva)?)');
@@ -120,9 +121,9 @@ function extractRawDocument(pages, name, forcedType = 'auto') {
       if ((type === 'deviz' && (finalIndex < 0 || i >= finalIndex)) || type === 'rep') {
         add('piese_facturat',getNumber('(?:total\\s+piese(?:\\s+de\\s+schimb)?|piese\\s+de\\s+schimb\\s+total)'),page.page,raw);
         add('materiale_facturat',getNumber('(?:cost(?:uri)?\\s+materiale(?:\\s+(?:de\\s+)?vopsitorie)?|total\\s+materiale(?:\\s+(?:de\\s+)?vopsitorie)?)'),page.page,raw);
-        if ((m = n.match(new RegExp('(?:tarif(?:\\s+orar)?(?:\\s+manopera)?|pret\\s+(?:ora|orar)(?:\\s+manopera)?|ora\\s+(?:de\\s+)?manopera)\\s*[:=]?\\s*(' + NUM + ')')))) add('ora_manopera_facturata',documentNumber(m[1]),page.page,raw);
+        if ((m = norm(joined).match(new RegExp('(?:tarif(?:\\s+orar)?(?:\\s+manopera)?|pret\\s+(?:ora|orar)(?:\\s+manopera)?|ora\\s+(?:de\\s+)?manopera)\\s*[:=]?\\s*(' + NUM + ')')))) add('ora_manopera_facturata',documentNumber(m[1]),page.page,raw);
         for (const [word, hours, money] of [['tinichigerie','ore_tinichigerie_facturat','rep_tin_total_document'],['vopsitorie','ore_vopsitorie_facturat','rep_vops_total_document']]) {
-          if ((m = n.match(new RegExp('(?:total\\s+)?(?:manopera\\s+)?' + word + '\\s*:?\\s*(' + NUM + ')\\s*(?:ore|h)\\b')))) add(hours,documentNumber(m[1]),page.page,raw);
+          if ((m = norm(joined).match(new RegExp('(?:total\\s+)?(?:manopera\\s+)?' + word + '\\s*:?\\s*(' + NUM + ')\\s*(?:ore|h)\\b')))) add(hours,documentNumber(m[1]),page.page,raw);
           if ((m = n.match(new RegExp('^total\\s+manopera\\s+' + word + '\\s*:?\\s*(' + NUM + ')\\s*$')))) add(money,documentNumber(m[1]),page.page,raw,'Unitatea nu este scrisă: confirmă că totalul este în lei.');
           add(hours,getNumber('(?:total\\s+)?ore\\s+(?:de\\s+)?(?:manopera\\s+)?' + word),page.page,raw);
           if ((m = n.match(new RegExp('(?:total\\s+)?manopera\\s+' + word + '\\s*:?\\s*(' + NUM + ')\\s*(?:lei|ron)\\b')))) add(money,documentNumber(m[1]),page.page,raw);
@@ -173,18 +174,24 @@ const NC_FIELDS = ['nr_dosar','numar_inmatriculare','marca_model','nume_pagubit'
 const DEVIZ_FIELDS = ['piese_facturat','materiale_facturat','ora_manopera_facturata','ore_tinichigerie_facturat','ore_vopsitorie_facturat','rep_tin_total_document','rep_vops_total_document','rep_manopera_total_document','tva_percent'];
 const RENT_CONTRACT_FIELDS = ['zile_facturate','auto_inchiriat_marca','rent_start','rent_end'];
 const ORDER_FIELDS = ['rep_start','rep_end'];
-function hasInvoiceHeading(text) {
-  return /(?:^|\n)\s*(?:factura(?:\s+fiscala)?|invoice)(?:\s*(?:nr\.?|numar|seria|no\.?|#|:)|\s*$|\s+[a-z0-9/-]+\s*$)/im.test(norm(text));
+function hasInvoiceHeading(text, name = '') {
+  const n = norm(text).replace(/f\s+a\s+c\s+t\s+u\s+r\s+a/g, 'factura');
+  if (/(?:^|\n)\s*(?:contract|comanda)\b/.test(n) && !/(?:^|\n)\s*factura\b/.test(n)) return false;
+  return /\bfactura(?:\s+fiscala)?\b/.test(n) && /(?:nr\.?|numar|seria|cui|cod fiscal|total)/.test(n)
+    || /factur/.test(norm(name)) && /(?:cui|cod fiscal)/.test(n) && /(?:total|valoare)/.test(n);
 }
 function sourceType(page, name, forcedType, allPages) {
   if (isNcFile(name)) return 'nc';
   if (isPolicyFile(name)) return 'polita';
   const n = norm(page.text), fn = norm(name);
-  if (hasInvoiceHeading(page.text)) {
+  // Titlul calculației finale este mai puternic decât referințele la o factură.
+  if (/calculati[ae]\s+finala|recapitulati[ae]|sumar\s+calcul/.test(n)) return 'deviz';
+  if (hasInvoiceHeading(page.text, name)) {
     if (forcedType === 'rep' || forcedType === 'rent') return forcedType;
-    const description = n.split(/denumirea?\s+(?:produs|servic)|descriere\s+(?:produs|servic)/).slice(1).join(' ') || n;
-    const rent = /inchiriere|lipsa de folosinta/.test(description);
-    const repair = /manopera|tinichigerie|vopsitorie|reparati[ei]/.test(description);
+    const description = n.split(/denumirea?\s+(?:produs|servic)|descriere(?:a)?\s+(?:produs|servic)/).slice(1).join(' ') || n;
+    const clean = description.replace(/comanda\s+(?:de\s+)?reparati[ei]/g, '').replace(/(?:furnizor|emitent|client|beneficiar)[^\n]*/g, '');
+    const rent = /inchiriere|lipsa de folosinta|rent[ -]?a[ -]?car/.test(clean);
+    const repair = /manopera|tinichigerie|vopsitorie|reparati[ei]|piese\s+(?:auto|de schimb)/.test(clean);
     if (rent && !repair) return 'rent';
     if (repair && !rent) return 'rep';
     if (/factura.*rent|cdrent/.test(fn) && !repair) return 'rent';
@@ -193,7 +200,7 @@ function sourceType(page, name, forcedType, allPages) {
   }
   if (/contract(?:ul)?[^\n]{0,60}(?:inchiriere|rent)/.test(n) || forcedType === 'contract' || /contract.*(?:rent|inchiriere)/.test(fn)) return 'contract';
   if (/comanda(?:\s+(?:de|ferma))?\s+reparati[ei]/.test(n) || forcedType === 'comanda' || /comanda.*repar/.test(fn)) return 'comanda';
-  if (forcedType === 'deviz' || /deviz|calculatie/.test(fn) || allPages.some(p=>/calculatie\s+finala|\bdeviz\b/.test(norm(p.text)))) return 'deviz';
+  if (forcedType === 'deviz' || /deviz|calculatie/.test(fn) || allPages.some(p=>/calculati[ae]\s+finala|\bdeviz\b/.test(norm(p.text)))) return 'deviz';
   return 'unknown';
 }
 function makeCandidate(field,value,page,name,evidence,note='',allowedFields=[field]) {
@@ -273,21 +280,27 @@ function addressCandidates(page,name,identity) {
 }
 export function extractDocument(pages,name,forcedType='auto',context={}) {
   const candidates=[],pageTypes=[],identity=ncIdentity(context.documents || [{name,pages}]);
+  const types=pages.map(p=>sourceType(p,name,forcedType,pages));
+  // Ultima pagină relevantă a devizului; ignoră anexe/pagini fără valori.
+  const summaryPages=pages.map((p,i)=>types[i]==='deviz' && extractRawDocument([p],name,'deviz').candidates.some(c=>DEVIZ_FIELDS.slice(0,5).includes(c.field)) ? i : -1).filter(i=>i>=0);
+  const lastSummary=summaryPages.length ? summaryPages[summaryPages.length-1] : pages.length-1;
   for(let i=0;i<pages.length;i++) {
     const page=pages[i],type=sourceType(page,name,forcedType,pages);pageTypes.push(type);
     let allowed=[];
     if(type==='nc')allowed=NC_FIELDS;
     if(type==='polita')allowed=['data_emitere_rca'];
-    if(type==='deviz' && i===pages.length-1)allowed=DEVIZ_FIELDS;
+    if(type==='deviz' && i===lastSummary)allowed=DEVIZ_FIELDS;
     if(type==='contract')allowed=RENT_CONTRACT_FIELDS;
     if(type==='comanda')allowed=ORDER_FIELDS;
     if(type==='rep' || type==='rent')allowed=[`${type}_factura_nr`,`${type}_factura_data`,`${type}_cui`,`${type}_emitent`,`${type}_localitate`,type==='rent'?'valoare_desp_rent_facturata':'rep_total_document'];
     const raw=extractRawDocument([page],name,type==='contract'?'rent':type==='comanda'?'rep':type).candidates;
     for(const candidate of raw) {
       if(!allowed.includes(candidate.field) || candidate.field==='data_emitere_rca' || candidate.field==='data_avizare')continue;
+      if (type==='nc' && candidate.field==='marca_model' && ncVehicleModel(page)) continue;
       candidates.push({...candidate,allowedFields:allowed});
       if(candidate.field==='data_constatare')candidates.push({...candidate,field:'data_avizare',note:'Aceeași dată a constatării din nc.pdf.',allowedFields:allowed});
     }
+    if(type==='nc') { const model=ncVehicleModel(page); if(model)candidates.push(makeCandidate('marca_model',model,page,name,`Marca / Model: ${model}`)); }
     if(type==='polita') {
       const value=policyGivenDate(page);
       if(value)candidates.push(makeCandidate('data_emitere_rca',value,page,name,`Date Given: ${value}`));
@@ -305,4 +318,49 @@ export function extractDocument(pages,name,forcedType='auto',context={}) {
   }
   const unique=candidates.filter((c,i,arr)=>arr.findIndex(x=>x.field===c.field && x.value===c.value && x.page===c.page)===i);
   return {candidates:unique,pageTypes};
+}
+
+function ncVehicleModel(page) {
+  const lines=page.text.split(/\n/);
+  for(let i=0;i<lines.length;i++) {
+    const line=lines[i];
+    const m=line.match(/\bmarca\s*(?:\/\s*model|model)?\s*[:=]\s*(.*)/i)
+      || line.match(/\bmarca,?\s*tipul[^:]*:\s*(.*)/i)
+      || line.match(/^\s*marca\s*(?:\/\s*model|model)?\s{2,}(.+)$/i)
+      || line.match(/^\s*marca\s*\/\s*model\s*$/i);
+    if(!m)continue;
+    const raw=(m[1]||lines[i+1]||'').trim();
+    if(/^(?:proprietar|nr\.?|numar|data|serie|vin|cnp)\b/i.test(norm(raw)))continue;
+    const value=raw.split(/\t|\s{3,}|\s*\(|\s+(?:Nr\.?|Num[ăa]r|Serie|VIN|Proprietar)\b/i)[0].trim();
+    if(value && value.length<100)return value.toUpperCase();
+  }
+  return null;
+}
+export function automaticPdfChanges(documents) {
+  const groups=new Map(), unresolved=[];
+  for(const doc of documents) {
+    for(const c of extractDocument(doc.pages,doc.name,'auto',{documents}).candidates) {
+      if(!c.field)continue;
+      if(!groups.has(c.field))groups.set(c.field,[]);
+      if (/_cui$/.test(c.field) && validCui(c.value) && new RegExp('(?:^|[^0-9])'+c.value+'(?:[^0-9]|$)').test(doc.name)) c.note = '';
+      groups.get(c.field).push(c);
+    }
+  }
+  const selected=[];
+  for(const [field,items] of groups) {
+    // Nu transformăm unități presupuse, CUI nevalid sau roluri incerte în valori certe.
+    const safe=items.filter(c=>!/(?:posibil al clientului|nu corespunde|Unitatea nu este scrisă|nu tariful)/i.test(c.note));
+    const normalized=[];
+    for(const c of safe) {
+      try { const validated=selectedChanges([{...c,selected:true}]); normalized.push({...c,value:validated[field],selected:true}); } catch (_) { /* valoare invalidă */ }
+    }
+    const values=new Set(normalized.map(c=>c.value));
+    if(values.size===1)selected.push(normalized[0]);else unresolved.push(field);
+  }
+  // Cele două date sunt corelate; conflictele rămân pentru completare manuală.
+  const dates=selected.filter(c=>['data_avizare','data_constatare'].includes(c.field));
+  if(new Set(dates.map(c=>c.value)).size>1) {
+    for(let i=selected.length-1;i>=0;i--)if(['data_avizare','data_constatare'].includes(selected[i].field)) { unresolved.push(selected[i].field); selected.splice(i,1); }
+  }
+  return {changes:selectedChanges(selected),unresolved:[...new Set(unresolved)]};
 }
