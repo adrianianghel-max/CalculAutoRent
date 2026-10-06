@@ -1,3 +1,4 @@
+import {AuditMarkup} from "./AuditMarkup";
 import {RepairCorrections} from "./RepairCorrections";
 import {useState,useEffect} from 'react';
 import {Button} from '@/components/ui/button';
@@ -24,7 +25,7 @@ export function RepairAudit({documents,onPickFiles,parsing,form,onApply}){
    {report.warnings.map((w,i)=><p key={i} className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-950">{w}</p>)}
    <p className="text-sm font-medium">{report.rows.length} repere NC • {report.rows.filter(r=>r.status==='found').length} cu operația regăsită • {report.rows.filter(r=>['missing','operation'].includes(r.status)).length} de verificat</p>
    {report.rows.map(r=><article key={r.nc.id} className="rounded-lg border bg-background p-3">
-    <h3 className="font-semibold">{r.nc.code} — {r.nc.text} · {OPERATIONS[r.nc.operation]}</h3>
+    <h3 className="font-semibold">NC {r.nc.positionNumber} · {r.nc.code} — {r.nc.text} · {OPERATIONS[r.nc.operation]}</h3>
     <p className="text-xs text-muted-foreground">NC: {r.nc.source}, pagina {r.nc.page}{r.nc.ocr?' · OCR':''}</p>
     <p className={`my-2 text-sm font-medium ${r.status==='found'?'text-green-700':'text-amber-700'}`}>{r.message}</p>
     {r.matches.map(d=><div key={d.id} className="my-2 rounded border p-2 text-sm"><p>{d.text}</p><p className="text-xs text-muted-foreground">{d.source}, pagina {d.page} · {OPERATIONS[d.operation]} · {d.reason}{d.ocr?' · OCR':''}</p><div className="mt-1 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={()=>teach(r.nc,d,'match')}>Confirmă asocierea și învață</Button><Button size="sm" variant="ghost" onClick={()=>teach(r.nc,d,'reject')}>Asociere greșită</Button></div></div>)}
@@ -33,6 +34,7 @@ export function RepairAudit({documents,onPickFiles,parsing,form,onApply}){
    </article>)}
    {!report.blocked&&<details className="rounded border bg-background p-3"><summary className="cursor-pointer font-medium">Poziții suplimentare / auxiliare fără asociere directă ({report.extras.length})</summary><p className="my-2 text-xs text-muted-foreground">Verifică necesitatea tehnică și eventualele reconstatări. Absența din NC nu înseamnă automat cost nejustificat. Lista poate fi incompletă dacă OCR-ul nu a citit toate rândurile.</p>{report.extras.map(d=><p key={d.id} className="border-t py-2 text-sm">{d.text}<span className="block text-xs text-muted-foreground">Pagina {d.page} · {OPERATIONS[d.operation]}{d.ocr?' · OCR':''}</span></p>)}</details>}
   </div>}
+ <AuditMarkup report={report} document={documents[Number(devizIndex)]} vat={form.tva_percent}/>
  <RepairCorrections document={documents[Number(devizIndex)]} form={form} onApply={onApply}/>
  </section>;
 }
