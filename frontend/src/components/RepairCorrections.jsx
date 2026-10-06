@@ -1,0 +1,31 @@
+import {automaticPdfChanges,documentNumber} from "@/lib/documentExtract";
+import {useEffect,useMemo,useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {toast} from 'sonner';
+import {BRANDS,REGIONS,readManualCorrections,loadCorrectionProfiles,saveCorrectionProfile,deleteCorrectionProfiles,correctionTotal} from '@/lib/repairCorrections';
+const LABELS={ore_tinichigerie:'Ore tinichigerie acceptate',ore_vopsitorie:'Ore vopsitorie acceptate',ora_manopera_acceptata:'Tarif de referință (lei/h)',materiale_vopsitorie_acceptat:'Materiale acceptate (lei)',piese_acceptat:'Piese acceptate (lei)'};
+export function RepairCorrections({document,form,onApply}){
+ const detected=useMemo(()=>readManualCorrections(document),[document]);
+ const [values,setValues]=useState({}),[brand,setBrand]=useState(''),[region,setRegion]=useState(''),[checkedOn,setCheckedOn]=useState(''),[confirmed,setConfirmed]=useState(false),[profiles,setProfiles]=useState(loadCorrectionProfiles),[note,setNote]=useState('');
+ useEffect(()=>{setValues(detected.values);setBrand(detected.brand);setRegion(detected.region);setCheckedOn('');setConfirmed(false);setNote('');},[detected]);
+ const total=correctionTotal(values,form.tva_percent);
+ const update=(field,value)=>{setValues(v=>({...v,[field]:value}));setConfirmed(false);};
+ const learn=()=>{if(!confirmed)return;try{setProfiles(saveCorrectionProfile(profiles,{brand,region,rate:values.ora_manopera_acceptata,checkedOn}));toast.success('Profil salvat local: context și tarif confirmat, fără datele dosarului.');}catch(e){toast.error(e.message);}};
+ const propose=()=>{const p=profiles.find(x=>x.brand===brand&&x.region===region);if(!p)return toast.info('Nu există profil salvat pentru marca și regiunea alese.');const current=document?automaticPdfChanges([document]).changes:{};setValues({ore_tinichigerie:current.ore_tinichigerie_facturat||'',ore_vopsitorie:current.ore_vopsitorie_facturat||'',ora_manopera_acceptata:String(p.rate),materiale_vopsitorie_acceptat:current.materiale_facturat||'',piese_acceptat:current.piese_facturat||''});setConfirmed(false);setCheckedOn(p.checkedOn);setNote(`Propunere cu tariful confirmat de tine la ${p.checkedOn}. Orele, piesele și materialele sunt recitite din devizul selectat; câmpurile neclare rămân goale: verifică-le în deviz. Profilul nu stabilește dacă tariful mai este actual sau potrivit modelului auto.`);};
+ return <details className="mt-4 rounded-lg border bg-background p-3" open={Boolean(document&&detected.evidence.length)}>
+ <summary className="cursor-pointer font-semibold">Corecțiile tale și învățarea modului de calcul ({profiles.length} profiluri)</summary>
+ <p className="my-2 text-sm text-muted-foreground">Confirmă corecțiile citite din deviz. Se învață metoda „orele dosarului curent × tariful de referință confirmat”, cu piese și materiale verificate separat. Numerele roșii, sublinierile și tăieturile fără explicație nu sunt interpretate automat ca modificări de cantitate sau respingeri.</p>
+ {detected.conflicts.length>0&&<p className="text-sm text-amber-700">Există valori corectate contradictorii. Câmpurile respective au rămas goale.</p>}
+ {!detected.evidence.length&&<p className="text-sm text-muted-foreground">Nu am identificat un calcul corectat explicit în PDF-ul ales. Poți completa valorile verificate mai jos.</p>}
+ <div className="mt-3 grid gap-3 sm:grid-cols-3"><label className="text-xs">Marcă<select className="mt-1 block w-full rounded border bg-background p-2" value={brand} onChange={e=>{setBrand(e.target.value);setConfirmed(false);}}><option value="">Alege marca</option>{BRANDS.map(b=><option key={b}>{b}</option>)}</select></label><label className="text-xs">Județ / regiune<select className="mt-1 block w-full rounded border bg-background p-2" value={region} onChange={e=>{setRegion(e.target.value);setConfirmed(false);}}><option value="">Alege regiunea</option>{REGIONS.map(r=><option key={r}>{r}</option>)}</select></label><label className="text-xs">Data verificării tarifului<Input type="date" value={checkedOn} onChange={e=>{setCheckedOn(e.target.value);setConfirmed(false);}}/></label></div>
+ <Button variant="outline" size="sm" className="my-3" onClick={propose} disabled={!brand||!region}>Propune corecția folosind profilul salvat</Button>
+ {note&&<p className="mb-3 text-sm text-amber-700">{note}</p>}
+ <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(LABELS).map(([field,label])=><label key={field} className="text-xs">{label}<Input inputMode="decimal" value={values[field]??''} onChange={e=>update(field,e.target.value)}/></label>)}</div>
+ {total&&<p className="my-3 text-sm font-medium">Calcul propus: manoperă {total.labor.toFixed(2)} lei · fără TVA {total.net.toFixed(2)} lei · cu TVA {form.tva_percent}%: {total.gross.toFixed(2)} lei</p>}
+ {detected.evidence.length>0&&<details className="my-3 text-xs"><summary className="cursor-pointer">Vezi textele corecțiilor citite și paginile</summary>{detected.evidence.map((e,i)=><p className="mt-2 break-words" key={i}>Pagina {e.page}: {e.text}</p>)}</details>}
+ <label className="my-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Am verificat valorile, contextul și aplicabilitatea tarifului pentru acest dosar.</label>
+ <div className="flex flex-wrap gap-2"><Button disabled={!confirmed||!total} onClick={()=>{onApply(Object.fromEntries(Object.entries(values).map(([k,v])=>[k,documentNumber(v)])));toast.success('Corecțiile confirmate au fost puse în coloana Acceptat. Recalculează dosarul.');}}>Aplică valorile confirmate în formular</Button><Button variant="outline" disabled={!confirmed||!total||!brand||!region||!checkedOn} onClick={learn}>Învață profilul de corecție</Button>{profiles.length>0&&<Button variant="ghost" onClick={()=>{try{deleteCorrectionProfiles();setProfiles([]);}catch{toast.error('Nu am putut șterge profilurile.');}}}>Șterge profilurile</Button>}</div>
+ <p className="mt-2 text-xs text-muted-foreground">Învățarea se păstrează în acest browser. Nu salvează documentele, orele sau sumele unui dosar. Profilul propune valori pentru verificare și nu modifică PDF-ul original.</p>
+ </details>;
+}
