@@ -384,7 +384,7 @@ export default function RentCalculator() {
             signal: controller.signal,
             onProgress: (message) => setPdfProgress(`${file.name} • ${message}`),
           });
-          documents.push({ name: file.name, pages });
+          documents.push({ name: file.name, pages, file });
         } catch (error) {
           if (!controller.signal.aborted) toast.error(`Nu am putut citi ${file.name}. ${error.message || "Verifică PDF-ul."}`);
         }
