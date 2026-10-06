@@ -267,6 +267,12 @@ export async function readPdfPages(file, { onProgress = () => {}, signal } = {})
       }
       let text = rows.map(row => row.items.sort((a,b)=>a.x-b.x).map((it,j,arr) => (j ? (it.x - arr[j-1].x - arr[j-1].width > 20 ? '\t' : ' ') : '') + it.str).join('')).join('\n');
       const nativeText = text;
+      const view = page.getViewport({scale:1});
+      let lineBoxes = rows.map(row => {
+        const left = Math.min(...row.items.map(it=>it.x)), right = Math.max(...row.items.map(it=>it.x+it.width));
+        const rect = view.convertToViewportRectangle([left,row.y-2,right,row.y+10]);
+        return {x:Math.min(rect[0],rect[2])/view.width,y:Math.min(rect[1],rect[3])/view.height,w:Math.abs(rect[2]-rect[0])/view.width,h:Math.abs(rect[3]-rect[1])/view.height};
+      });
       let method = 'Text PDF', warning = '';
       // Scanned pages can carry hundreds of characters of digital annotations.
       // That text alone must not hide the underlying repair table from OCR.
@@ -282,7 +288,14 @@ export async function readPdfPages(file, { onProgress = () => {}, signal } = {})
         try {
           const worker = await getOcrWorker();
           const rendered = await renderPage(page, 2);
-          try { text = (await worker.recognize(rendered.canvas)).data.text || ''; method = 'OCR local'; }
+          try {
+            const data = (await worker.recognize(rendered.canvas)).data;
+            if (data.lines?.length) {
+              text = data.lines.map(line=>line.text.trim()).join('\n');
+              lineBoxes = data.lines.map(({bbox:b})=>({x:b.x0/rendered.canvas.width,y:b.y0/rendered.canvas.height,w:(b.x1-b.x0)/rendered.canvas.width,h:(b.y1-b.y0)/rendered.canvas.height}));
+            } else {text = data.text || ''; lineBoxes = [];}
+            method = 'OCR local';
+          }
           finally { rendered.canvas.width = 0; rendered.canvas.height = 0; }
         } catch (_) { warning = 'OCR nereușit pe această pagină; verifică documentul manual.'; }
       }
@@ -294,9 +307,50 @@ export async function readPdfPages(file, { onProgress = () => {}, signal } = {})
         const selected = items.filter(it => it.x + it.width / 2 >= b.xmin - 2 && it.x + it.width / 2 <= b.xmax + 2 && it.y >= b.ymin - 3 && it.y <= b.ymax + 3).map(it=>it.str).join(' ');
         if (selected) highlights.push(selected);
       }
-      pages.push({ page: i, text, nativeText, textItems: method === "Text PDF" ? items : [], method, highlights, warning });
+      pages.push({ page: i, text, nativeText, lineBoxes, textItems: method === "Text PDF" ? items : [], method, highlights, warning });
       page.cleanup();
     }
     return pages;
   } finally { await task.destroy(); }
+}
+
+// Export a visibly annotated COPY. Original File stays untouched; all processing stays local.
+export async function exportMarkedDeviz(file, markup, totals, onProgress = () => {}) {
+  const {jsPDF} = await import('jspdf');
+  const task = pdfjsLib.getDocument({data:await file.arrayBuffer(),isEvalSupported:false});
+  try {
+    const pdf = await task.promise;let out;
+    for(let i=1;i<=pdf.numPages;i++) {
+      onProgress(`Pregătesc pagina ${i}/${pdf.numPages}`);
+      const page=await pdf.getPage(i),view=page.getViewport({scale:1});
+      const orientation=view.width>view.height?'landscape':'portrait';
+      if(!out)out=new jsPDF({unit:'pt',format:[view.width,view.height],orientation,compress:true});
+      else out.addPage([view.width,view.height],orientation);
+      const rendered=await renderPage(page,2);
+      try{out.addImage(rendered.canvas.toDataURL('image/jpeg',0.94),'JPEG',0,0,view.width,view.height,undefined,'FAST');}
+      finally{rendered.canvas.width=0;rendered.canvas.height=0;}
+      out.setTextColor(220,0,0);out.setDrawColor(220,0,0);out.setLineWidth(1.1);
+      for(const mark of markup.marks.filter(m=>m.page===i)){
+        const b=mark.box,x=b.x*view.width,y=b.y*view.height,w=b.w*view.width,h=b.h*view.height;
+        if(mark.kind==='strike')out.line(x,y+h/2,x+w,y+h/2);
+        else {out.setFont('helvetica','bold');out.setFontSize(Math.max(9,Math.min(13,h)));const label=mark.numbers.join(',');const tx=Math.max(3,x-out.getTextWidth(label)-5);out.text(label,tx,y+h*0.85);}
+      }
+      page.cleanup();
+    }
+    out.addPage('a4','portrait');out.setTextColor(0);out.setFont('helvetica','normal');out.setFontSize(11);
+    let y=42;
+    const ascii=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7E]/g,' ');
+    const line=(s)=>{const lines=out.splitTextToSize(ascii(s),510);for(const l of lines){if(y>795){out.addPage('a4');y=42;}out.text(l,42,y);y+=15;}};
+    line('DEVIZ VERIFICAT - SINTEZA MARCAJELOR');
+    line('Numere rosii = pozitii din nota de constatare. Linii rosii = excluderi confirmate de utilizator.');
+    line('Copie vizuala adnotata; originalul nu a fost modificat. Verificati marcajele OCR si valorile inainte de utilizare.');y+=10;
+    for(const mark of markup.marks.filter(m=>m.kind==='number'))line(`NC ${mark.numbers.join(', ')} -> pagina ${mark.page}: ${mark.text}`);
+    y+=10;line('EXCLUDERI CONFIRMATE (valori totale de rand, fara TVA):');
+    for(const d of markup.deductions)line(`Pagina ${d.page}: ${d.text} | scazut: ${d.amount.toFixed(2)} lei`);
+    line(`Total de scazut fara TVA: ${markup.deduction.toFixed(2)} lei`);
+    if(totals){line(`Deviz initial fara TVA: ${totals.base.toFixed(2)} lei`);line(`Total revizuit fara TVA: ${totals.net.toFixed(2)} lei`);line(`Total revizuit cu TVA ${totals.vat}%: ${totals.gross.toFixed(2)} lei`);}
+    else line('Nu s-a recalculat totalul devizului; nu au fost confirmate excluderi.');
+    line('Reducerea include exclusiv sumele confirmate; adaosurile, materialele procentuale si operatiile comune trebuie verificate separat.');
+    out.save('Deviz_verificat_NC.pdf');
+  } finally {await task.destroy();}
 }
