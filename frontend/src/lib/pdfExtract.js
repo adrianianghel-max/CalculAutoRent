@@ -256,7 +256,7 @@ export async function readPdfPages(file, { onProgress = () => {}, signal } = {})
     for (let i = 1; i <= pdf.numPages; i++) {
       if (signal?.aborted) throw new Error('Citire anulată.');
       onProgress(`Pagina ${i}/${pdf.numPages}`);
-      const page = await pdf.getPage(i), content = await page.getTextContent();
+      const page = await pdf.getPage(i), content = await page.getTextContent().catch(() => ({ items: [] }));
       const items = content.items.filter(it => it.str?.trim()).map(it => ({ str: it.str, x: it.transform[4], y: it.transform[5], width: it.width || 0 }));
       items.sort((a, b) => b.y - a.y || a.x - b.x);
       const rows = [];
@@ -266,8 +266,18 @@ export async function readPdfPages(file, { onProgress = () => {}, signal } = {})
         row.items.push(it);
       }
       let text = rows.map(row => row.items.sort((a,b)=>a.x-b.x).map((it,j,arr) => (j ? (it.x - arr[j-1].x - arr[j-1].width > 20 ? '\t' : ' ') : '') + it.str).join('')).join('\n');
+      const nativeText = text;
       let method = 'Text PDF', warning = '';
-      if (text.replace(/\s/g,'').length < 60) {
+      // Scanned pages can carry hundreds of characters of digital annotations.
+      // That text alone must not hide the underlying repair table from OCR.
+      let scannedWithOverlay = false;
+      if (text.replace(/\s/g, '').length < 1500) {
+        try {
+          const ops = await page.getOperatorList();
+          scannedWithOverlay = ops.fnArray.some(op => [pdfjsLib.OPS.paintImageXObject, pdfjsLib.OPS.paintInlineImageXObject].includes(op));
+        } catch { /* OCR fallback below still handles empty pages. */ }
+      }
+      if (text.replace(/\s/g,'').length < 60 || scannedWithOverlay) {
         onProgress(`Pagina ${i}/${pdf.numPages} • OCR local`);
         try {
           const worker = await getOcrWorker();
@@ -284,7 +294,7 @@ export async function readPdfPages(file, { onProgress = () => {}, signal } = {})
         const selected = items.filter(it => it.x + it.width / 2 >= b.xmin - 2 && it.x + it.width / 2 <= b.xmax + 2 && it.y >= b.ymin - 3 && it.y <= b.ymax + 3).map(it=>it.str).join(' ');
         if (selected) highlights.push(selected);
       }
-      pages.push({ page: i, text, textItems: method === "Text PDF" ? items : [], method, highlights, warning });
+      pages.push({ page: i, text, nativeText, textItems: method === "Text PDF" ? items : [], method, highlights, warning });
       page.cleanup();
     }
     return pages;
