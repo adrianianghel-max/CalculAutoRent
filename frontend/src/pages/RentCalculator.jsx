@@ -1,3 +1,4 @@
+import { RepairAudit } from "@/components/RepairAudit";
 import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import defaultHolidays from "@/lib/holidays.json";
@@ -259,6 +260,7 @@ export default function RentCalculator() {
   const [cuiLoading, setCuiLoading] = useState("");
   const [parsing, setParsing] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
+  const [auditDocuments, setAuditDocuments] = useState([]);
   const pdfAbort = useRef(null);
   const pdfSession = useRef({ documents: [], baseline: {} });
   const formRef = useRef(form);
@@ -369,6 +371,7 @@ export default function RentCalculator() {
     if (!files.length) return;
     setParsing(true);
     pdfSession.current = { documents: [], baseline: {} };
+    setAuditDocuments([]);
     setLearningFeedback({});
     const controller = new AbortController();
     pdfAbort.current = controller;
@@ -395,6 +398,7 @@ export default function RentCalculator() {
         const next = { ...formRef.current, ...changes };
         formRef.current = next;
         pdfSession.current = { documents, baseline: { ...next } };
+        setAuditDocuments(documents);
         if (Object.keys(changes).length) {
           setForm(next);
           setResult(null);
@@ -532,6 +536,7 @@ export default function RentCalculator() {
     pdfAbort.current?.abort();
     cuiRequest.current?.abort();
     pdfSession.current = { documents: [], baseline: {} };
+    setAuditDocuments([]);
     setLearningFeedback({});
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
     formRef.current = empty;
@@ -546,6 +551,7 @@ export default function RentCalculator() {
     pdfAbort.current?.abort();
     cuiRequest.current?.abort();
     pdfSession.current = { documents: [], baseline: {} };
+    setAuditDocuments([]);
     setLearningFeedback({});
     const empty = { ...EMPTY_FORM, culpa_periods: [] };
     formRef.current = empty;
@@ -649,6 +655,7 @@ export default function RentCalculator() {
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
         <p className="mb-4 text-xs text-muted-foreground">Învățare: importă PDF-urile, corectează sau completează câmpurile, apoi apasă butonul secțiunii. Regulile se păstrează doar în acest browser; documentele și valorile personale nu sunt salvate ca exemple. Căutarea ANAF trimite doar CUI-ul firmei și data interogării.</p>
         {parsing && <div role="status" className="mb-4 rounded-lg border p-3 text-sm">{pdfProgress || "Citesc documentele local…"}<Button variant="outline" size="sm" className="ml-3" onClick={() => { pdfAbort.current?.abort(); setPdfProgress("Anulare după pagina curentă…"); }}>Anulează</Button></div>}
+        <RepairAudit documents={auditDocuments} onPickFiles={onPickFiles} parsing={parsing} form={form} onApply={(changes) => { patch(changes); setResult(null); setLetter(""); }} />
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* LEFT: form */}
           <div className="w-full space-y-5 lg:w-[60%]" onKeyDown={enterNextField}>
